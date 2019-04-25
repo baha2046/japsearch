@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import com.jfoenix.controls.JFXButton?>
+<?import com.jfoenix.controls.JFXListView?>
+<?import com.jfoenix.controls.JFXTextArea?>
+<?import com.jfoenix.controls.JFXTextField?>
+<?import de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.image.Image?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.paint.LinearGradient?>
+<?import javafx.scene.paint.Stop?>
+<?import javafx.scene.shape.Rectangle?>
+<?import javafx.scene.text.Font?>
+<?import javafx.scene.text.Text?>
+
+<AnchorPane maxHeight="660.0" maxWidth="460.0" minHeight="660.0" minWidth="460.0" prefHeight="660.0" prefWidth="460.0" style="-fx-background-color: transparent;" xmlns="http://javafx.com/javafx/11.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="org.nagoya.view.FXMovieDetailView">
+    <ImageView fitHeight="656.0" fitWidth="456.0" pickOnBounds="true" style="-fx-effect: dropshadow( three-pass-box, rgba(0,0,0,0.4), 3, 0.0, 4, 4);">
+        <Image url="@../res/313-jsZYQJL._SY450_.jpg" />
+    </ImageView>
+    <Rectangle height="564.0" layoutY="93.0" stroke="#ffffff00" strokeType="INSIDE" width="119.0">
+        <fill>
+            <LinearGradient>
+                <stops>
+                    <Stop color="#1e0909db" />
+                    <Stop color="#1e0909db" offset="0.007662835249042145" />
+                    <Stop color="#660524c9" offset="0.5292096219931272" />
+                    <Stop color="#8c072f95" offset="1.0" />
+                </stops>
+            </LinearGradient>
+        </fill>
+    </Rectangle>
+    <Rectangle height="93.0" stroke="#ffffff00" strokeType="INSIDE" strokeWidth="0.0" width="456.0">
+        <fill>
+            <LinearGradient>
+                <stops>
+                    <Stop color="#3f0832a6" />
+                    <Stop color="#301985b2" offset="1.0" />
+                </stops>
+            </LinearGradient>
+        </fill>
+    </Rectangle>
+    <JFXTextField fx:id="txt1" alignment="BOTTOM_LEFT" focusColor="#6f7da1" layoutX="31.0" layoutY="27.0" prefHeight="30.0" prefWidth="415.0" style="-fx-background-color: transparent; -fx-effect: dropshadow( three-pass-box, rgba(0,0,0,0.4), 3, 0.0, 2, 2); -fx-text-inner-color: #EEEEEE;" text="TITLETITLETITLETITLETITLETITLE TITLETITLE TITLETITLETITLE TITLE " unFocusColor="#d7d7d7">
+        <font>
+            <Font size="18.0" />
+        </font>
+        <padding>
+            <Insets left="5.0" />
+        </padding>
+    </JFXTextField>
+    <JFXTextField fx:id="txt2" layoutX="129.0" layoutY="117.0" prefHeight="30.0" prefWidth="79.0" style="-fx-background-color: transparent; -fx-effect: dropshadow( three-pass-box, rgba(0,0,0,0.4), 3, 0.0, 2, 2);" text="year">
+        <font>
+            <Font size="14.0" />
+        </font>
+        <padding>
+            <Insets left="5.0" />
+        </padding>
+    </JFXTextField>
+    <Text fill="#282727" layoutX="131.0" layoutY="112.0" strokeType="OUTSIDE" strokeWidth="0.0" style="-fx-effect: dropshadow( three-pass-box, rgba(0,0,0,0.4), 3, 0.0, 2, 2);" text="Year">
+        <font>
+            <Font name="Chinese Asian Style" size="14.0" />
+        </font>
+    </Text>
+    <Text fill="#282727" layoutX="268.0" layoutY="112.0" strokeType="OUTSIDE" strokeWidth="0.0" style="-fx-effect: dropshadow( three-pass-box, rgba(0,0,0,0.4), 3, 0.0, 2, 2);" text="Release Day">
+        <font>
+            <Font name="Chinese Asian Style" size="14.0" />
+        </font>
+    </Text>
+    <Text fill="#282727" layoutX="131.0" layoutY="177.0" strokeType="OUTSIDE" strokeWidth="0.0" style="-fx-effect: dropshadow( three-pass-box, rgba(0,0,0,0.4), 3, 0.0, 2, 2);" text="Video ID">
+        <font>
+            <Font name="Chinese Asian Style" size="14.0" />
+        </font>
+    </Text>
+    <Text fill="#282727" layoutX="131.0" layoutY="210.0" strokeType="OUTSIDE" strokeWidth="0.0" style="-fx-effect: dropshadow( three-pass-box, rgba(0,0,0,0.4), 3, 0.0, 2, 2);" text="label">
+        <font>
+            <Font name="Chinese Asian Style" size="14.0" />
+        </font>
+    </Text>
+    <Text fill="#282727" layoutX="131.0" layoutY="243.0" strokeType="OUTSIDE" strokeWidth="0.0" style="-fx-effect: dropshadow( three-pass-box, rgba(0,0,0,0.4), 3, 0.0, 2, 2);" text="Series">
+        <font>
+            <Font name="Chinese Asian Style" size="14.0" />
+        </font>
+    </Text>
+    <JFXTextField fx:id="txt6" layoutX="193.0" layoutY="220.0" prefHeight="30.0" prefWidth="253.0" style="-fx-background-color: transparent; -fx-effect: dropshadow( three-pass-box, rgba(0,0,0,0.4), 3, 0.0, 2, 2);" text="set">
+        <font>
+            <Font size="14.0" />
+        </font>
+        <padding>
+            <Insets left="5.0" />
+        </padding>
+    </JFXTextField>
+    <JFXTextField fx:id="txt4" layoutX="193.0" layoutY="156.0" prefHeight="30.0" prefWidth="110.0" style="-fx-background-color: transparent; -fx-effect: dropshadow( three-pass-box, rgba(0,0,0,0.4), 3, 0.0, 2, 2);" text="id">
+        <font>
+            <Font size="14.0" />
+        </font>
+        <padding>
+            <Insets left="5.0" />
+        </padding>
+    </JFXTextField>
+    <JFXTextField fx:id="txt5" layoutX="193.0" layoutY="188.0" prefHeight="30.0" prefWidth="253.0" style="-fx-background-color: transparent; -fx-effect: dropshadow( three-pass-box, rgba(0,0,0,0.4), 3, 0.0, 2, 2);" text="studio">
+        <font>
+            <Font size="14.0" />
+        </font>
+        <padding>
+            <Insets left="5.0" />
+        </padding>
+    </JFXTextField>
+    <JFXTextArea fx:id="txt7" layoutX="129.0" layoutY="263.0" prefHeight="118.0" prefWidth="315.0" style="-fx-background-color: transparent; -fx-effect: dropshadow( three-pass-box, rgba(0,0,0,0.4), 3, 0.0, 2, 2);" text="plot" wrapText="true">
+        <font>
+            <Font size="14.0" />
+        </font>
+        <padding>
+            <Insets left="5.0" top="5.0" />
+        </padding>
+    </JFXTextArea>
+    <JFXListView fx:id="lvGenres" layoutX="11.0" layoutY="162.0" prefHeight="427.0" prefWidth="110.0" style="-fx-background-color: transparent;" styleClass="list-cell" stylesheets="@../css/listcell.css" />
+    <JFXListView fx:id="lvActors" layoutX="175.0" layoutY="391.0" maxHeight="263.0" maxWidth="282.0" minHeight="254.0" minWidth="272.0" prefHeight="263.0" prefWidth="282.0" style="-fx-background-color: transparent;" styleClass="list-cell" stylesheets="@../css/listcell.css" />
+    <JFXButton layoutX="129.0" layoutY="445.0" maxHeight="50.0" maxWidth="45.0" minHeight="29.0" minWidth="45.0" onAction="#addActorAction" prefHeight="29.0" prefWidth="45.0" style="-fx-effect: dropshadow( three-pass-box, rgba(0,0,0,0.4), 3, 0.0, 2, 2);" styleClass="custom-button" stylesheets="@../css/fileListButton.css" textFill="WHITE" textOverrun="CLIP">
+        <graphic>
+            <FontAwesomeIconView fill="#4d4b4b" glyphName="USER_PLUS" size="22" />
+        </graphic>
+    </JFXButton>
+    <Text fill="#282727" layoutX="131.0" layoutY="406.0" strokeType="OUTSIDE" strokeWidth="0.0" style="-fx-effect: dropshadow( three-pass-box, rgba(0,0,0,0.4), 3, 0.0, 2, 2);" text="Actors">
+        <font>
+            <Font name="Chinese Asian Style" size="14.0" />
+        </font>
+    </Text>
+    <JFXTextField fx:id="txtD" alignment="BOTTOM_LEFT" focusColor="#6f7da1" layoutX="31.0" layoutY="64.0" prefHeight="17.0" prefWidth="239.0" style="-fx-background-color: transparent; -fx-effect: dropshadow( three-pass-box, rgba(0,0,0,0.4), 3, 0.0, 2, 2); -fx-text-inner-color: #EEEEEE;" text="111" unFocusColor="#d6d6d600">
+        <padding>
+            <Insets left="5.0" />
+        </padding>
+    </JFXTextField>
+    <JFXTextField fx:id="txtM" alignment="BOTTOM_LEFT" focusColor="#6f7da1" layoutX="31.0" layoutY="12.0" prefHeight="17.0" prefWidth="239.0" style="-fx-background-color: transparent; -fx-effect: dropshadow( three-pass-box, rgba(0,0,0,0.4), 3, 0.0, 2, 2); -fx-text-inner-color: #EEEEEE;" text="111" unFocusColor="#d6d6d600">
+        <padding>
+            <Insets left="5.0" />
+        </padding>
+    </JFXTextField>
+    <FontAwesomeIconView fill="WHITE" glyphName="COG" layoutX="17.0" layoutY="26.0" size="16" />
+    <FontAwesomeIconView fill="WHITE" glyphName="FILM" layoutX="16.0" layoutY="50.0" size="14" />
+    <FontAwesomeIconView fill="WHITE" glyphName="VIDEO_CAMERA" layoutX="17.0" layoutY="77.0" size="14" />
+   <JFXTextField fx:id="txt3" layoutX="271.0" layoutY="117.0" prefHeight="30.0" prefWidth="150.0" style="-fx-background-color: transparent; -fx-effect: dropshadow( three-pass-box, rgba(0,0,0,0.4), 3, 0.0, 2, 2);" text="date">
+      <font>
+         <Font size="14.0" />
+      </font>
+      <padding>
+         <Insets left="5.0" />
+      </padding>
+   </JFXTextField>
+</AnchorPane>

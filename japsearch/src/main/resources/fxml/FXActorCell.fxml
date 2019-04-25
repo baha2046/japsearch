@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import com.jfoenix.controls.*?>
+<?import de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.text.Font?>
+<fx:root type="javafx.scene.layout.AnchorPane" xmlns:fx="http://javafx.com/fxml" prefHeight="100.0" prefWidth="248.0"
+            style="-fx-background-color: transparent;">
+    <JFXTextField fx:id="txtName" layoutX="104.0" layoutY="5.0" prefHeight="30.0" prefWidth="132.0"
+                  style="-fx-effect: dropshadow( three-pass-box, rgba(0,0,0,0.4), 3, 0.0, 2, 2);" text="123">
+        <font>
+            <Font name="System Bold" size="14.0"/>
+        </font>
+    </JFXTextField>
+    <JFXToggleButton fx:id="btnEdit" layoutX="98.0" layoutY="42.0" prefHeight="54.0" prefWidth="91.0" text="Edit"/>
+    <JFXButton fx:id="btnSave" layoutX="194.0" layoutY="42.0" maxHeight="29.0" maxWidth="45.0" minHeight="29.0"
+               minWidth="45.0" onAction="#saveAction" prefHeight="29.0" prefWidth="45.0" styleClass="custom-button"
+               stylesheets="@../css/fileListButton.css" textOverrun="CLIP">
+        <graphic>
+            <FontAwesomeIconView fill="#4a4949" glyphName="CHECK_CIRCLE" size="22"/>
+        </graphic>
+    </JFXButton>
+    <JFXButton fx:id="btnImage" layoutX="2.0" layoutY="2.0" maxHeight="96.0" maxWidth="96.0" minHeight="96.0"
+               minWidth="96.0" onAction="#editImageAction" prefHeight="96.0" prefWidth="96.0">
+        <graphic>
+            <ImageView fx:id="imgActor" fitHeight="96.0" fitWidth="96.0" pickOnBounds="true" preserveRatio="true"
+                       style="-fx-effect: dropshadow( three-pass-box, rgba(0,0,0,0.4), 3, 0.0, 2, 2);"/>
+        </graphic>
+    </JFXButton>
+    <JFXButton fx:id="btnDel" alignment="CENTER" layoutX="194.0" layoutY="70.0" maxHeight="29.0" maxWidth="45.0"
+               minHeight="29.0" minWidth="45.0" onAction="#deleteAction" prefHeight="29.0" prefWidth="45.0"
+               styleClass="custom-button" stylesheets="@../css/fileListButton.css" textOverrun="CLIP">
+        <graphic>
+            <FontAwesomeIconView fill="#4a4949" glyphName="USER_TIMES" size="22"/>
+        </graphic>
+    </JFXButton>
+</fx:root>

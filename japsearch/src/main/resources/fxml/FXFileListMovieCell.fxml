@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Rectangle2D?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.paint.LinearGradient?>
+<?import javafx.scene.paint.Stop?>
+<?import javafx.scene.shape.Rectangle?>
+<?import javafx.scene.text.Font?>
+
+<fx:root maxWidth="460.0" minWidth="460.0" prefHeight="80.0" prefWidth="460.0" type="javafx.scene.layout.AnchorPane" xmlns="http://javafx.com/javafx/11.0.1" xmlns:fx="http://javafx.com/fxml/1">
+    <Rectangle arcHeight="5.0" arcWidth="5.0" fill="#c4c4c6" height="40.0" layoutY="40.0" opacity="0.3" stroke="BLACK" strokeType="INSIDE" strokeWidth="0.0" width="400.0" />
+    <Rectangle fx:id="dirMask" arcHeight="5.0" arcWidth="5.0" fill="#c4c4c6" height="80.0" opacity="0.3" stroke="BLACK" strokeType="INSIDE" strokeWidth="0.0" width="460.0" />
+    <Rectangle fx:id="rect" arcHeight="5.0" arcWidth="5.0" fill="#f87849" height="5.0" layoutX="120.0" layoutY="27.0" opacity="0.5" stroke="BLACK" strokeType="INSIDE" strokeWidth="0.0" style="-fx-effect: dropshadow( three-pass-box, rgba(0,0,0,0.4), 3, 0.0, 2, 2);;" width="169.0" />
+    <Label fx:id="studioLabel" layoutX="121.0" layoutY="5.0" minWidth="128.0" prefHeight="23.0" prefWidth="140.0" style="-fx-effect: dropshadow( three-pass-box, rgba(0,0,0,0.4), 3, 0.0, 2, 2);;" text="Label" textFill="#ff1484">
+        <font>
+            <Font name="System Bold" size="14.0" />
+        </font>
+    </Label>
+    <ImageView fx:id="iconView" fitHeight="24.0" fitWidth="24.0" layoutX="265.0" layoutY="7.0" pickOnBounds="true" preserveRatio="true" style="-fx-effect: dropshadow( three-pass-box, rgba(0,0,0,0.4), 3, 0.0, 2, 2);;">
+        <viewport>
+            <Rectangle2D height="24.0" width="24.0" />
+        </viewport>
+    </ImageView>
+    <Separator layoutX="115.0" layoutY="3.0" orientation="VERTICAL" prefHeight="36.0" stylesheets="@../css/fileListButton.css" />
+    <Label fx:id="nameLabel" layoutX="5.0" layoutY="39.0" minWidth="244.0" prefHeight="25.0" prefWidth="386.0" style="-fx-effect: dropshadow( three-pass-box, rgba(0,0,0,0.4), 3, 0.0, 2, 2); -fx-alignment: center-right;" text="Label">
+        <font>
+            <Font name="System Bold" size="16.0" />
+        </font>
+        <textFill>
+            <LinearGradient>
+                <stops>
+                    <Stop color="#4625f5" />
+                    <Stop color="#1e7eab" offset="1.0" />
+                </stops>
+            </LinearGradient>
+        </textFill>
+        <graphic>
+            <!-- <EmojiOneView fill="#68446b" glyphName="FILM_FRAMES" size="18"/>-->
+        </graphic>
+    </Label>
+    <Label fx:id="pathLabel" layoutX="11.0" layoutY="57.0" minWidth="244.0" prefHeight="23.0" prefWidth="379.0" style="-fx-effect: dropshadow( three-pass-box, rgba(0,0,0,0.4), 3, 0.0, 2, 2); -fx-alignment: center-right;" text="Label" textFill="#757373" textOverrun="LEADING_ELLIPSIS">
+        <font>
+            <Font name="System Bold" size="11.0" />
+        </font>
+    </Label>
+    <Label fx:id="idLabel" layoutX="5.0" layoutY="9.0" maxHeight="24.0" maxWidth="104.0" minHeight="24.0" minWidth="104.0" prefHeight="24.0" prefWidth="104.0" style="-fx-alignment: center; -fx-effect: dropshadow( three-pass-box, rgba(0,0,0,0.4), 3, 0.0, 2, 2);;" styleClass="custom-button" stylesheets="@../css/fileListButton.css" text="Label" textFill="#2f2e2e">
+        <font>
+            <Font name="System Bold" size="14.0" />
+        </font>
+    </Label>
+    <Label fx:id="typeLabel" layoutX="297.0" layoutY="9.0" maxHeight="24.0" maxWidth="104.0" minHeight="24.0" minWidth="104.0" prefHeight="24.0" prefWidth="104.0" style="-fx-alignment: center; -fx-effect: dropshadow( three-pass-box, rgba(0,0,0,0.4), 3, 0.0, 2, 2);;" styleClass="custom-button" stylesheets="@../css/fileListButton.css" text="Label" textFill="#2f2e2e">
+        <font>
+            <Font name="System Bold" size="14.0" />
+        </font>
+    </Label>
+    <Separator layoutX="293.0" layoutY="3.0" orientation="VERTICAL" prefHeight="36.0" stylesheets="@../css/fileListButton.css" />
+    <ImageView fx:id="imageView" fitHeight="70.0" fitWidth="51.0" layoutX="405.0" layoutY="6.0" pickOnBounds="true" preserveRatio="true" style="-fx-effect: dropshadow( three-pass-box, rgba(0,0,0,0.4), 3, 0.0, 2, 2);">
+    </ImageView>
+</fx:root>

@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Rectangle2D?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.paint.*?>
+<?import javafx.scene.shape.Rectangle?>
+<?import javafx.scene.text.Font?>
+<fx:root type="javafx.scene.layout.AnchorPane" xmlns:fx="http://javafx.com/fxml/1" maxWidth="460.0" minWidth="460.0"
+         prefHeight="40.0" prefWidth="460.0" xmlns="http://javafx.com/javafx/8.0.1">
+    <Rectangle fx:id="dirMask" arcHeight="5.0" arcWidth="5.0" height="40.0" stroke="BLACK" strokeType="INSIDE"
+               strokeWidth="0.0" width="460.0">
+        <fill>
+            <LinearGradient>
+                <stops>
+                    <Stop color="#0000001a"/>
+                    <Stop color="#0000001a" offset="0.7663230240549821"/>
+                    <Stop color="WHITE" offset="1.0"/>
+                </stops>
+            </LinearGradient>
+        </fill>
+    </Rectangle>
+    <Rectangle fx:id="rect" arcHeight="5.0" arcWidth="5.0" fill="#f87849" height="6.0" layoutX="108.0"
+               layoutY="29.0" opacity="0.5" stroke="BLACK" strokeType="INSIDE" strokeWidth="0.0"
+               style="-fx-effect: dropshadow( three-pass-box, rgba(0,0,0,0.4), 3, 0.0, 2, 2);;" width="344.0"/>
+    <Label fx:id="nameLabel" layoutX="109.0" layoutY="5.0" minWidth="244.0" prefHeight="23.0" prefWidth="309.0"
+           style="-fx-effect: dropshadow( three-pass-box, rgba(0,0,0,0.4), 3, 0.0, 2, 2);;" text="Label"
+           textAlignment="RIGHT">
+        <font>
+            <Font name="System Bold" size="16.0"/>
+        </font>
+        <textFill>
+            <LinearGradient>
+                <stops>
+                    <Stop color="#727275"/>
+                    <Stop color="#5211dd" offset="1.0"/>
+                </stops>
+            </LinearGradient>
+        </textFill>
+    </Label>
+    <ImageView fx:id="iconView" fitHeight="24.0" fitWidth="24.0" layoutX="428.0" layoutY="7.0" pickOnBounds="true"
+               preserveRatio="true"
+               style="-fx-effect: dropshadow( three-pass-box, rgba(0,0,0,0.4), 3, 0.0, 2, 2);;">
+        <viewport>
+            <Rectangle2D height="24.0" width="24.0"/>
+        </viewport>
+    </ImageView>
+    <Label fx:id="typeLabel" layoutX="5.0" layoutY="9.0" minWidth="90.0" prefHeight="23.0" prefWidth="90.0"
+           style="-fx-alignment: center; -fx-effect: dropshadow( three-pass-box, rgba(0,0,0,0.4), 3, 0.0, 2, 2);;"
+           styleClass="custom-button" stylesheets="@../css/fileListButton.css" text="Label" textAlignment="CENTER"
+           textFill="#797979">
+        <font>
+            <Font name="System Bold" size="14.0"/>
+        </font>
+    </Label>
+    <Separator layoutX="101.0" layoutY="3.0" orientation="VERTICAL" prefHeight="36.0"/>
+</fx:root>
