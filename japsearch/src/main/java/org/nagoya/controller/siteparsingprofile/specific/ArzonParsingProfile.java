@@ -12,23 +12,20 @@ import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.nagoya.GUICommon;
 import org.nagoya.controller.languagetranslation.Language;
-import org.nagoya.controller.languagetranslation.TranslateString;
 import org.nagoya.controller.siteparsingprofile.SiteParsingProfile;
 import org.nagoya.model.SearchResult;
-import org.nagoya.model.dataitem.*;
 import org.nagoya.model.dataitem.Runtime;
+import org.nagoya.model.dataitem.*;
 import org.nagoya.preferences.GeneralSettings;
 import org.nagoya.system.Systems;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.SocketTimeoutException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
 
 public class ArzonParsingProfile extends SiteParsingProfile implements SpecificProfile {
     private boolean doGoogleTranslation;
@@ -96,56 +93,23 @@ public class ArzonParsingProfile extends SiteParsingProfile implements SpecificP
 
     @Override
     public Title scrapeTitle() {
-        Element titleElement = this.document.select("h1").first();
-        // run a google translate on the japanese title
+        Element titleElement = this.document.select(ArzonCSSQuery.Q_TITLE).first();
 
         if (titleElement != null) {
-            System.out.println("scrapeTitle() >> " + titleElement.text());
-
-            if (this.doGoogleTranslation) {
-                return new Title(TranslateString.translateStringJapaneseToEnglish(titleElement.text()));
-            } else {
-                return new Title(titleElement.text());
-            }
+            return new Title(titleElement.text());
         } else {
             return new Title("");
         }
     }
 
     @Override
-    public OriginalTitle scrapeOriginalTitle() {
-        Element titleElement = this.document.select("h1").first();
-        // leave the original title as the japanese title
-        return new OriginalTitle(titleElement.text());
-    }
-
-    @Override
-    public SortTitle scrapeSortTitle() {
-        // we don't need any special sort title - that's usually something the
-        // user provides
-        return SortTitle.BLANK_SORTTITLE;
-    }
-
-    @Override
     public Option<Set> scrapeSet() {
-        // I found that this シリーズ： is always empty so I cannot test it
-        Element setElement = this.document.select("tr td:contains(シリーズ：) + td").first();
-        return (null == setElement) ? Option.none() : Option.of(new Set(setElement.text()));
-    }
-
-    @Override
-    public Rating scrapeRating() {
-        return Rating.BLANK_RATING;
-    }
-
-    @Override
-    public Option<Year> scrapeYear() {
-        return this.scrapeReleaseDate().map(ReleaseDate::getYear);
+        return defaultScrapeSet(ArzonCSSQuery.Q_SET);
     }
 
     @Override
     public Option<ReleaseDate> scrapeReleaseDate() {
-        Element releaseDateElement = this.document.select("tr td:contains(発売日：) + td").first();
+        Element releaseDateElement = this.document.select(ArzonCSSQuery.Q_RDATE).first();
 
         if (releaseDateElement != null) {
             String releaseDate = releaseDateElement.text();
@@ -161,89 +125,29 @@ public class ArzonParsingProfile extends SiteParsingProfile implements SpecificP
     }
 
     @Override
-    public Top250 scrapeTop250() {
-        return Top250.BLANK_TOP250;
-    }
-
-    @Override
-    public Votes scrapeVotes() {
-        return Votes.BLANK_VOTES;
-    }
-
-    @Override
-    public Outline scrapeOutline() {
-        // TODO Auto-generated method stub
-        return Outline.BLANK_OUTLINE;
-    }
-
-    @Override
     public Option<Plot> scrapePlot() {
-        Element plotElement = this.document.select("div.item_text").first();
-
+        Element plotElement = this.document.select(ArzonCSSQuery.Q_PLOT).first();
         return (plotElement == null) ? Option.none() : Option.of(new Plot((plotElement.text().substring(5))));
     }
 
     @Override
-    public Tagline scrapeTagline() {
-        return Tagline.BLANK_TAGLINE;
-    }
-
-    @Override
     public Option<Runtime> scrapeRuntime() {
-        String runtime = "";
-
-        Element runtimeElement = this.document.select("tr td:contains(収録時間：) + td").first();
-
-        return (runtimeElement == null) ? Option.none() : Option.of(new Runtime(runtimeElement.text().replaceAll("分", "")));
+        return defaultScrapeRuntime(ArzonCSSQuery.Q_TIME);
     }
 
     @Override
     public Trailer scrapeTrailer() {
-
         return Trailer.BLANK_TRAILER;
     }
 
     @Override
     public Option<FxThumb> scrapeCover() {
-        Element postersElement = this.document.select("a[data-lightbox=jacket1]").first();
-
-        if (postersElement != null) {
-            String posterLink = postersElement.attr("abs:href");
-            System.out.println("scrapeCover() >> " + posterLink);
-
-            return FxThumb.of(posterLink);
-        }
-        return Option.none();
-    }
-
-    @Override
-    @Deprecated
-    public FxThumb[] scrapePosters() {
-        return null;
-    }
-
-    @Override
-    @Deprecated
-    public FxThumb[] scrapeExtraFanart() {
-        Elements extraArtElements = this.document.select("div[class=detail_img] a[data-lightbox=items]");
-
-        ArrayList<FxThumb> thumbsList = new ArrayList<>(1 + extraArtElements.size());
-
-        for (Element extraArt : extraArtElements) {
-            String thumbsLink = extraArt.attr("abs:href");
-
-            if (thumbsLink != null) {
-                System.out.println("scrapeExtraArt() >> " + thumbsLink);
-                thumbsList.add(FxThumb.of(thumbsLink).get());
-            }
-        }
-
-        return thumbsList.toArray(new FxThumb[0]);
+        return defaultScrapeCover(ArzonCSSQuery.Q_COVER);
     }
 
     @Override
     public Stream<FxThumb> scrapeExtraImage() {
-        Elements extraArtElements = this.document.select("div[class=detail_img] a[data-lightbox=items]");
+        Elements extraArtElements = this.document.select(ArzonCSSQuery.Q_THUMBS);
 
         if (null == extraArtElements) {
             return Stream.empty();
@@ -258,25 +162,11 @@ public class ArzonParsingProfile extends SiteParsingProfile implements SpecificP
     }
 
     @Override
-    @Deprecated
-    public FxThumb[] scrapeFanart() {
-        return null;
-    }
-
-    @Override
-    public Option<MPAARating> scrapeMPAA() {
-        return Option.of(MPAARating.RATING_XXX);
-    }
-
-    @Override
     public ID scrapeID() {
-        Element idElement = this.document.select("tr td:contains(品番：) + td").first();
+        Element idElement = this.document.select(ArzonCSSQuery.Q_ID).first();
         if (idElement != null) {
             String idElementText = idElement.text();
             idElementText = fixUpIDFormatting(idElementText);
-
-            System.out.println("scrapeID() >> " + idElementText);
-
             return new ID(idElementText);
         }
         //This page didn't have an ID, so just put in a empty one
@@ -289,7 +179,7 @@ public class ArzonParsingProfile extends SiteParsingProfile implements SpecificP
     public ArrayList<Genre> scrapeGenres() {
         int genre_num = 0;
 
-        Element genre = this.document.select("tr td:contains(ジャンル：) + td").first();
+        Element genre = this.document.select(ArzonCSSQuery.Q_GENRES).first();
         Elements genreElements = genre.select("ul");
 
         // Arzon genres divided into parent and child cat.,
@@ -319,79 +209,14 @@ public class ArzonParsingProfile extends SiteParsingProfile implements SpecificP
 
         ArrayList<Genre> genresReturn = new ArrayList<>(genre_num);
         for (int x = 0; x < genre_num; x++) {
-            if (this.doGoogleTranslation) {
-                genresReturn.add(new Genre(TranslateString.translateStringJapaneseToEnglish(genresList.get(x))));
-            } else {
-                genresReturn.add(new Genre(genresList.get(x)));
-            }
+            genresReturn.add(new Genre(genresList.get(x)));
         }
         return genresReturn;
     }
 
-    @Deprecated
-    @Override
-    public ArrayList<Actor> scrapeActors() {
-        Element actressIDElements = this.document.select("tr td:contains(AV女優：) + td").first();
-        Elements actressURL = actressIDElements.select("a");
-
-        System.out.println("scrapeActors() >> " + actressURL.size());
-        List<Runnable> tasks = new ArrayList<>();
-        ArrayList<Actor> actorList = new ArrayList<>(actressURL.size());
-        for (Element actressIDLink : actressURL) {
-            tasks.add(() -> {
-                String actressIDHref = actressIDLink.attr("abs:href");
-                String actressName = actressIDLink.text();
-
-                //Option<FxThumb> thumbActorDmm = this.scrapeActorThumbFromDmm(actressName);
-
-
-                System.out.println("scrapeActors() >> " + actressName + " " + actressIDHref);
-
-                // If thumb exist in DMM use it
-            //    actorList.add(new Actor(actressName, "", thumbActorDmm.getOrNull()));
-
-	/*			// Try to load from Arzon.jp
-				try {
-					Document actressPage = Jsoup.connect(actressIDHref + "?t=&agecheck=1&m=all&s=&q=").userAgent("Mozilla").timeout(SiteParsingProfile.CONNECTION_TIMEOUT_VALUE).of();
-
-					Element actressThumbnailElement = actressPage.select("table.p_list1 tr td img").first();
-					String actressThumbnailPath = actressThumbnailElement.attr("abs:src");
-
-					system.out.println("scrapeActors() >> " + actressThumbnailPath);
-
-					// 27682S.jpg is a blank image for no photo
-					if(actressThumbnailPath == null || actressThumbnailPath.contains("27682S.jpg"))
-					{
-						actorList.add(new Actor(actressName, "", null));
-					}
-					else
-					{
-						actorList.add(new Actor(actressName, "", new Thumb(actressThumbnailPath, false, refererURL)));
-					}
-
-				} catch (SocketTimeoutException e)
-				{
-					system.err.println("Cannot download from " + actressIDHref.toString() + ": Socket timed out: " + e.getLocalizedMessage());
-				} catch (IOException e)
-				{
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}*/
-            });
-        }
-
-        CompletableFuture<?>[] futures = tasks.stream()
-                .map(task -> CompletableFuture.runAsync(task, Systems.getExecutorServices()))
-                .toArray(CompletableFuture[]::new);
-        CompletableFuture.allOf(futures).join();
-
-        return actorList;
-
-    }
-
     @Override
     public void scrapeActorsAsync(ObservableList<ActorV2> observableList) {
-        Element actressIDElements = this.document.select("tr td:contains(AV女優：) + td").first();
+        Element actressIDElements = this.document.select(ArzonCSSQuery.Q_ACTORS).first();
         Elements actressURL = actressIDElements.select("a");
 
         for (Element actressIDLink : actressURL) {
@@ -410,45 +235,17 @@ public class ArzonParsingProfile extends SiteParsingProfile implements SpecificP
 
     @Override
     public ArrayList<Director> scrapeDirectors() {
-        ArrayList<Director> directors = new ArrayList<>();
-
-        Element directorElement = this.document.select("tr td:contains(監督：) + td").first();
-
-        if (directorElement != null && directorElement.hasText()) {
-            if (this.doGoogleTranslation) {
-                directors.add(new Director(TranslateString.translateStringJapaneseToEnglish(directorElement.text()), null));
-            } else {
-                directors.add(new Director(directorElement.text(), null));
-            }
-        }
-
-        System.out.println("scrapeDirectors() >> " + directorElement.text());
-
-        return directors;
+        return defaultScrapeDirectors(ArzonCSSQuery.Q_DIRECTOR);
     }
 
     @Override
     public Option<Studio> scrapeStudio() {
-        Element studioElement = this.document.select("tr td:contains(AVレーベル：) + td").first();
-
-        return (studioElement == null) ? Option.none() : Option.of(new Studio(studioElement.text()));
+        return defaultScrapeStudio(ArzonCSSQuery.Q_STUDIO);
     }
 
     @Override
     public Studio scrapeMaker() {
-        Element studioElement = this.document.select("tr td:contains(AVメーカー：) + td").first();
-
-        if (studioElement != null) {
-            System.out.println("scrapeStudio() >> " + studioElement.text());
-
-            if (this.doGoogleTranslation) {
-                return new Studio(TranslateString.translateStringJapaneseToEnglish(studioElement.text()));
-            } else {
-                return new Studio(studioElement.text());
-            }
-        } else {
-            return Studio.BLANK_STUDIO;
-        }
+        return defaultScrapeMaker(ArzonCSSQuery.Q_MAKER);
     }
 
     @Override

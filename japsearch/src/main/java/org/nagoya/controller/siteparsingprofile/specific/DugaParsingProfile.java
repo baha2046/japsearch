@@ -14,20 +14,16 @@ import org.nagoya.GUICommon;
 import org.nagoya.controller.languagetranslation.Language;
 import org.nagoya.controller.siteparsingprofile.SiteParsingProfile;
 import org.nagoya.model.SearchResult;
-import org.nagoya.model.dataitem.*;
 import org.nagoya.model.dataitem.Runtime;
+import org.nagoya.model.dataitem.*;
+import org.nagoya.model.dataitem.Set;
 import org.nagoya.preferences.GeneralSettings;
 import org.nagoya.system.Systems;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.SocketTimeoutException;
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
+import java.util.*;
 
 public class DugaParsingProfile extends SiteParsingProfile implements SpecificProfile {
     private URL refererURL;
@@ -78,104 +74,47 @@ public class DugaParsingProfile extends SiteParsingProfile implements SpecificPr
     @Override
     public List<ScraperGroupName> getScraperGroupNames() {
         if (this.groupNames == null) {
-            this.groupNames = Arrays.asList(ScraperGroupName.JAV_CENSORED_SCRAPER_GROUP);
+            this.groupNames = Collections.singletonList(ScraperGroupName.JAV_CENSORED_SCRAPER_GROUP);
         }
         return this.groupNames;
     }
 
     @Override
     public Title scrapeTitle() {
-        Element titleElement = this.document.select("h1[class=title]").first();
-        // run a google translate on the japanese title
-
+        Element titleElement = this.document.select(DugaCSSQuery.Q_TITLE).first();
         if (titleElement != null) {
-            System.out.println("scrapeTitle() >> " + titleElement.text());
-
             return new Title(titleElement.text());
-
         } else {
             return new Title("");
         }
     }
 
     @Override
-    public OriginalTitle scrapeOriginalTitle() {
-        Element titleElement = this.document.select("h1[class=title]").first();
-        // leave the original title as the japanese title
-        return new OriginalTitle(titleElement.text());
-    }
-
-    @Override
-    public SortTitle scrapeSortTitle() {
-        // we don't need any special sort title - that's usually something the
-        // user provides
-        return SortTitle.BLANK_SORTTITLE;
-    }
-
-    @Override
     public Option<Set> scrapeSet() {
-        // I found that this シリーズ： is always empty so I cannot test it
-        Element setElement = this.document.select("tr th:contains(シリーズ) + td").first();
-        return (null == setElement) ? Option.none() : Option.of(new Set(setElement.text()));
-    }
-
-    @Override
-    public Rating scrapeRating() {
-        return Rating.BLANK_RATING;
-    }
-
-    @Override
-    public Option<Year> scrapeYear() {
-        return this.scrapeReleaseDate().map(ReleaseDate::getYear);
+        return defaultScrapeSet(DugaCSSQuery.Q_SET);
     }
 
     @Override
     public Option<ReleaseDate> scrapeReleaseDate() {
-        Element releaseDateElement = this.document.select("tr th:contains(発売日) + td span").first();
+        Element releaseDateElement = this.document.select(DugaCSSQuery.Q_RDATE).first();
 
         if (releaseDateElement != null) {
             String releaseDate = releaseDateElement.attr("content");
-            //we want to convert something like 2015/04/25 to 2015-04-25
             releaseDate = StringUtils.replace(releaseDate, "/", "-");
-
-            System.out.println("scrapeReleaseDate() >> " + releaseDate);
-
             return Option.of(new ReleaseDate(releaseDate));
         }
         return Option.none();
     }
 
     @Override
-    public Top250 scrapeTop250() {
-        return Top250.BLANK_TOP250;
-    }
-
-    @Override
-    public Votes scrapeVotes() {
-        return Votes.BLANK_VOTES;
-    }
-
-    @Override
-    public Outline scrapeOutline() {
-        // TODO Auto-generated method stub
-        return Outline.BLANK_OUTLINE;
-    }
-
-    @Override
     public Option<Plot> scrapePlot() {
-        Element plotElement = this.document.select("p[class=introduction]").first();
-
+        Element plotElement = this.document.select(DugaCSSQuery.Q_PLOT).first();
         return (plotElement == null) ? Option.none() : Option.of(new Plot((plotElement.text())));
     }
 
     @Override
-    public Tagline scrapeTagline() {
-        return Tagline.BLANK_TAGLINE;
-    }
-
-    @Override
     public Option<Runtime> scrapeRuntime() {
-        Element runtimeElement = this.document.select("tr th:contains(再生時間) + td").first();
+        Element runtimeElement = this.document.select(DugaCSSQuery.Q_TIME).first();
 
         if (runtimeElement != null && runtimeElement.text().length() > 0) {
             // of rid of japanese word for minutes and just of the number
@@ -193,44 +132,19 @@ public class DugaParsingProfile extends SiteParsingProfile implements SpecificPr
     }
 
     @Override
-    @Deprecated
-    public FxThumb[] scrapePosters() {
-        return null;
-    }
-
-    @Override
     public Option<FxThumb> scrapeCover() {
-        Element postersElement = this.document.select("a[itemprop=image]").first();
+        Element postersElement = this.document.select(DugaCSSQuery.Q_COVER).first();
 
         if (postersElement != null) {
             String posterLink = postersElement.attr("href");
-            System.out.println("scrapePostersAndFanart() >> " + posterLink);
             return FxThumb.of(posterLink);
         }
         return Option.none();
     }
 
-    private FxThumb[] scrapeExtraArt() {
-        Element extraArtE = this.document.select("ul[id=digestthumbbox]").first();
-        Elements extraArtElements = extraArtE.select("a");
-
-        ArrayList<FxThumb> thumbsList = new ArrayList<>(1 + extraArtElements.size());
-
-        for (Element extraArt : extraArtElements) {
-            String thumbsLink = extraArt.attr("href");
-
-            if (thumbsLink != null) {
-                System.out.println("scrapeExtraArt() >> " + thumbsLink);
-                thumbsList.add(FxThumb.of(thumbsLink).get());
-            }
-        }
-
-        return thumbsList.toArray(new FxThumb[0]);
-    }
-
     @Override
     public Stream<FxThumb> scrapeExtraImage() {
-        Element extraArtE = this.document.select("ul[id=digestthumbbox]").first();
+        Element extraArtE = this.document.select(DugaCSSQuery.Q_THUMBS).first();
         Elements extraArtElements = extraArtE.select("a");
 
         if (null == extraArtElements || extraArtElements.size() > 20) {
@@ -246,19 +160,8 @@ public class DugaParsingProfile extends SiteParsingProfile implements SpecificPr
     }
 
     @Override
-    @Deprecated
-    public FxThumb[] scrapeFanart() {
-        return null;
-    }
-
-    @Override
-    public Option<MPAARating> scrapeMPAA() {
-        return Option.of(MPAARating.RATING_XXX);
-    }
-
-    @Override
     public ID scrapeID() {
-        Element idElement = this.document.select("tr th:contains(メーカー品番) + td").first();
+        Element idElement = this.document.select(DugaCSSQuery.Q_ID).first();
         if (idElement != null) {
             String idElementText = idElement.text();
             idElementText = fixUpIDFormatting(idElementText);
@@ -277,7 +180,7 @@ public class DugaParsingProfile extends SiteParsingProfile implements SpecificPr
     public ArrayList<Genre> scrapeGenres() {
         int genre_num = 0;
 
-        Element genre = this.document.select("tr th:contains(カテゴリ) + td").first();
+        Element genre = this.document.select(DugaCSSQuery.Q_GENRES).first();
         Elements genreElements = genre.select("a");
 
         // Arzon genres divided into parent and child cat.,
@@ -304,43 +207,8 @@ public class DugaParsingProfile extends SiteParsingProfile implements SpecificPr
     }
 
     @Override
-    public ArrayList<Actor> scrapeActors() {
-        ArrayList<Actor> actorList = new ArrayList<>();
-
-        Element actressIDElements = this.document.select("ul[class=performer]").first();
-
-        if (actressIDElements != null) {
-            Elements actressURL = actressIDElements.select("a");
-
-            System.out.println("scrapeActors() >> " + actressURL.size());
-            List<Runnable> tasks = new ArrayList<>();
-
-            for (Element actressIDLink : actressURL) {
-                tasks.add(() -> {
-                    String actressIDHref = actressIDLink.attr("abs:href");
-                    String actressName = actressIDLink.text();
-
-                  //  Option<FxThumb> thumbActorDmm = this.scrapeActorThumbFromDmm(actressName);
-
-                    System.out.println("scrapeActors() >> " + actressName + " " + actressIDHref);
-
-                    // If thumb exist in DMM use it
-                  //  actorList.add(new Actor(actressName, "", thumbActorDmm.getOrNull()));
-
-                });
-            }
-
-            CompletableFuture<?>[] futures = tasks.stream()
-                    .map(task -> CompletableFuture.runAsync(task, Systems.getExecutorServices()))
-                    .toArray(CompletableFuture[]::new);
-            CompletableFuture.allOf(futures).join();
-        }
-        return actorList;
-    }
-
-    @Override
     public void scrapeActorsAsync(ObservableList<ActorV2> observableList) {
-        Element actressIDElements = this.document.select("ul[class=performer]").first();
+        Element actressIDElements = this.document.select(DugaCSSQuery.Q_ACTORS).first();
 
         if (actressIDElements != null) {
             Elements actressURL = actressIDElements.select("a");
@@ -363,37 +231,17 @@ public class DugaParsingProfile extends SiteParsingProfile implements SpecificPr
 
     @Override
     public ArrayList<Director> scrapeDirectors() {
-        ArrayList<Director> directors = new ArrayList<>();
-
-        Element directorElement = this.document.select("tr th:contains(監督) + td").first();
-
-        if (directorElement != null && directorElement.hasText()) {
-            directors.add(new Director(directorElement.text(), null));
-
-            System.out.println("scrapeDirectors() >> " + directorElement.text());
-        }
-
-        return directors;
+        return defaultScrapeDirectors(DugaCSSQuery.Q_DIRECTOR);
     }
 
     @Override
     public Option<Studio> scrapeStudio() {
-        Element studioElement = this.document.select("tr th:contains(レーベル) + td").first();
-
-        return (studioElement == null) ? Option.none() : Option.of(new Studio(studioElement.text()));
+        return defaultScrapeStudio(DugaCSSQuery.Q_STUDIO);
     }
 
     @Override
     public Studio scrapeMaker() {
-        Element studioElement = this.document.select("tr th:contains(メーカー) + td").first();
-
-        if (studioElement != null) {
-            System.out.println("scrapeMaker() >> " + studioElement.text());
-
-            return new Studio(studioElement.text());
-        } else {
-            return Studio.BLANK_STUDIO;
-        }
+        return defaultScrapeMaker(DugaCSSQuery.Q_MAKER);
     }
 
     @Override
@@ -447,24 +295,6 @@ public class DugaParsingProfile extends SiteParsingProfile implements SpecificPr
             e.printStackTrace();
             return new SearchResult[0];
         }
-    }
-
-    @Override
-    public FxThumb[] scrapeExtraFanart() {
-        Elements extraArtElements = this.document.select("ul[class=digestimage] a");
-
-        ArrayList<FxThumb> thumbsList = new ArrayList<>(1 + extraArtElements.size());
-
-        for (Element extraArt : extraArtElements) {
-            String thumbsLink = extraArt.attr("abs:href");
-
-            if (thumbsLink != null) {
-                System.out.println("scrapeExtraArt() >> " + thumbsLink);
-                thumbsList.add(FxThumb.of(thumbsLink).get());
-            }
-        }
-
-        return thumbsList.toArray(new FxThumb[0]);
     }
 
     @Override

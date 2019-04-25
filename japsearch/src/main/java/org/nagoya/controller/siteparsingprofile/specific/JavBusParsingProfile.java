@@ -15,14 +15,12 @@ import org.nagoya.controller.languagetranslation.Language;
 import org.nagoya.controller.languagetranslation.TranslateString;
 import org.nagoya.controller.siteparsingprofile.SiteParsingProfile;
 import org.nagoya.model.SearchResult;
-import org.nagoya.model.dataitem.*;
 import org.nagoya.model.dataitem.Runtime;
+import org.nagoya.model.dataitem.*;
 import org.nagoya.system.Systems;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.MalformedURLException;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -72,7 +70,7 @@ public class JavBusParsingProfile extends SiteParsingProfile implements Specific
 
     @Override
     public Title scrapeTitle() {
-        Element titleElement = this.document.select("div.container h3").first();
+        Element titleElement = this.document.select(JavBusCSSQuery.Q_TITLE).first();
         if (titleElement != null) {
             String titleText = titleElement.text();
             titleText = titleText.replace("- JavBus", "");
@@ -98,12 +96,6 @@ public class JavBusParsingProfile extends SiteParsingProfile implements Specific
         return (null == setElement) ? Option.none() : Option.of(new Set(setElement.text()));
     }
 
-
-    @Override
-    public Option<Year> scrapeYear() {
-        return this.scrapeReleaseDate().map(ReleaseDate::getYear);
-    }
-
     @Override
     public Option<ReleaseDate> scrapeReleaseDate() {
         String releaseDateWord = (this.scrapingLanguage == Language.ENGLISH) ? "Release Date:" : "発売日:";
@@ -116,35 +108,15 @@ public class JavBusParsingProfile extends SiteParsingProfile implements Specific
     }
 
     @Override
-    public Top250 scrapeTop250() {
-        return Top250.BLANK_TOP250;
-    }
-
-    @Override
-    public Votes scrapeVotes() {
-        return Votes.BLANK_VOTES;
-    }
-
-    @Override
-    public Outline scrapeOutline() {
-        return Outline.BLANK_OUTLINE;
-    }
-
-    @Override
     public Option<Plot> scrapePlot() {
         return Option.none();
-    }
-
-    @Override
-    public Tagline scrapeTagline() {
-        return Tagline.BLANK_TAGLINE;
     }
 
     @Override
     public Option<Runtime> scrapeRuntime() {
         String lengthWord = (this.scrapingLanguage == Language.ENGLISH) ? "Length:" : "収録時間:";
         Element lengthElement = this.document.select("p:contains(" + lengthWord + ")").first();
-        if (lengthElement != null && lengthElement.ownText().trim().length() >= 0) {
+        if (lengthElement != null) {
             //Getting rid of the word "min" in both Japanese and English
             String runtimeText = lengthElement.ownText().trim().replace("min", "");
             runtimeText = runtimeText.replace("分", "");
@@ -153,62 +125,20 @@ public class JavBusParsingProfile extends SiteParsingProfile implements Specific
         return Option.none();
     }
 
-    @Deprecated
-    @Override
-    public FxThumb[] scrapePosters() {
-        return this.scrapePostersAndFanart(true);
-    }
-
-    @Deprecated
-    @Override
-    public FxThumb[] scrapeFanart() {
-        return this.scrapePostersAndFanart(false);
-    }
-
     @Override
     public Option<FxThumb> scrapeCover() {
-        Element posterElement = this.document.select("a.bigImage").first();
-        System.out.println("updateView  -- scrapeID " + posterElement.toString());
+        Element posterElement = this.document.select(JavBusCSSQuery.Q_COVER).first();
+
         if (posterElement != null) {
-
             return FxThumb.of(posterElement.attr("href"));
-
         }
         return Option.none();
 
     }
 
-    @Deprecated
-    private FxThumb[] scrapePostersAndFanart(boolean isPosterScrape) {
-        Element posterElement = this.document.select("a.bigImage").first();
-        if (posterElement != null) {
-            FxThumb posterImage = FxThumb.of(posterElement.attr("href")).get();
-            return new FxThumb[]{posterImage};
-        } else {
-            return new FxThumb[0];
-        }
-    }
-
-    @Override
-    @Deprecated
-    public FxThumb[] scrapeExtraFanart() {
-        Elements extraFanartElements = this.document.select("a.sample-box");
-        if (extraFanartElements != null && extraFanartElements.size() > 0) {
-            FxThumb[] extraFanart = new FxThumb[extraFanartElements.size()];
-            int i = 0;
-            for (Element extraFanartElement : extraFanartElements) {
-                String href = extraFanartElement.attr("href");
-                extraFanart[i] = FxThumb.of(href).get();
-                i++;
-            }
-            return extraFanart;
-        }
-        return new FxThumb[0];
-    }
-
     @Override
     public Stream<FxThumb> scrapeExtraImage() {
-        Elements extraFanartElements = this.document.select("a.sample-box");
+        Elements extraFanartElements = this.document.select(JavBusCSSQuery.Q_THUMBS);
 
         if (extraFanartElements == null || extraFanartElements.size() > 20) {
             return Stream.empty();
@@ -223,14 +153,9 @@ public class JavBusParsingProfile extends SiteParsingProfile implements Specific
     }
 
     @Override
-    public Option<MPAARating> scrapeMPAA() {
-        return Option.of(MPAARating.RATING_XXX);
-    }
-
-    @Override
     public ID scrapeID() {
-        Element idElement = this.document.select("p:contains(品番:) > span + span").first();
-        System.out.println("updateView  -- scrapeID " + idElement.toString());
+        Element idElement = this.document.select(JavBusCSSQuery.Q_ID).first();
+
         if (idElement != null) {
             return new ID(idElement.text());
         } else {
@@ -241,7 +166,7 @@ public class JavBusParsingProfile extends SiteParsingProfile implements Specific
     @Override
     public ArrayList<Genre> scrapeGenres() {
         ArrayList<Genre> genreList = new ArrayList<>();
-        Elements genreElements = this.document.select("span.genre a[href*=/genre/]");
+        Elements genreElements = this.document.select(JavBusCSSQuery.Q_GENRES);
         if (genreElements != null) {
             for (Element genreElement : genreElements) {
                 String genreText = genreElement.text();
@@ -258,35 +183,8 @@ public class JavBusParsingProfile extends SiteParsingProfile implements Specific
     }
 
     @Override
-    public ArrayList<Actor> scrapeActors() {
-        ArrayList<Actor> actorList = new ArrayList<>();
-        Elements actorElements = this.document.select("div.star-box li a img");
-        if (actorElements != null) {
-            for (Element currentActor : actorElements) {
-                FxThumb thumbnail = null;
-                String actorName = currentActor.attr("title");
-                //Sometimes for whatever reason the english page still has the name in japanaese, so I will translate it myself
-                if (this.scrapingLanguage == Language.ENGLISH && JapaneseCharacter.containsJapaneseLetter(actorName)) {
-                    actorName = TranslateString.translateJapanesePersonNameToRomaji(actorName);
-                }
-                String actorImage = currentActor.attr("src");
-                if (actorImage != null && !actorImage.contains("printing.gif") && fileExistsAtURL(actorImage)) {
-
-                    try {
-                        thumbnail = FxThumb.of(new URL(actorImage));
-                    } catch (MalformedURLException e) {
-                        e.printStackTrace();
-                    }
-                }
-                actorList.add(new Actor(actorName, null, thumbnail));
-            }
-        }
-        return actorList;
-    }
-
-    @Override
     public void scrapeActorsAsync(ObservableList<ActorV2> observableList) {
-        Elements actorElements = this.document.select("div.star-box li a img");
+        Elements actorElements = this.document.select(JavBusCSSQuery.Q_ACTORS);
         if (actorElements != null) {
             Systems.useExecutors(() -> {
                 for (Element currentActor : actorElements) {

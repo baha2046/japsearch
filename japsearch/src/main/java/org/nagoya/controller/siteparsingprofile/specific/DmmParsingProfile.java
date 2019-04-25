@@ -17,9 +17,9 @@ import org.nagoya.controller.languagetranslation.Language;
 import org.nagoya.controller.languagetranslation.TranslateString;
 import org.nagoya.controller.siteparsingprofile.SiteParsingProfile;
 import org.nagoya.model.SearchResult;
-import org.nagoya.model.dataitem.*;
 import org.nagoya.model.dataitem.Runtime;
 import org.nagoya.model.dataitem.Set;
+import org.nagoya.model.dataitem.*;
 import org.nagoya.preferences.GeneralSettings;
 import org.nagoya.system.Systems;
 
@@ -139,33 +139,16 @@ public class DmmParsingProfile extends SiteParsingProfile implements SpecificPro
 
     @Override
     public Title scrapeTitle() {
-        Element titleElement = this.document.select("[property=og:title]").first();
-        // run a google translate on the japanese title
-        if (this.doGoogleTranslation) {
-            return new Title(TranslateString.translateStringJapaneseToEnglish(titleElement.attr("content").toString()));
-        } else {
+        Element titleElement = this.document.select(DmmCSSQuery.Q_TITLE).first();
+        if (titleElement != null)
             return new Title(titleElement.attr("content").toString());
-        }
-    }
-
-    @Override
-    public OriginalTitle scrapeOriginalTitle() {
-        Element titleElement = this.document.select("[property=og:title]").first();
-        // leave the original title as the japanese title
-        return new OriginalTitle(titleElement.attr("content").toString());
-    }
-
-    @Override
-    public SortTitle scrapeSortTitle() {
-        // we don't need any special sort title - that's usually something the
-        // user provides
-        return SortTitle.BLANK_SORTTITLE;
+        else
+            return new Title("");
     }
 
     @Override
     public Option<Set> scrapeSet() {
-        Element setElement = this.document.select("table.mg-b20 tr td a[href*=article=series/id=]").first();
-        return (null == setElement) ? Option.none() : Option.of(new Set(setElement.text()));
+        return defaultScrapeSet(DmmCSSQuery.Q_SET);
     }
 
     @Override
@@ -179,40 +162,14 @@ public class DmmParsingProfile extends SiteParsingProfile implements SpecificPro
     }
 
     @Override
-    public Option<Year> scrapeYear() {
-        return scrapeReleaseDate().map(ReleaseDate::getYear);
-    }
-
-    @Override
     public Option<ReleaseDate> scrapeReleaseDate() {
-        Element releaseDateElement = this.document.select("table.mg-b20 tr td:contains(貸出開始日：) + td, table.mg-b20 tr td:contains(発売日：) + td, table.mg-b20 tr td:contains(商品発売日：) + td")
-                .first();
-
-        return (releaseDateElement == null) ? Option.none() : Option.of(new ReleaseDate(
-                StringUtils.replace(releaseDateElement.text(), "/", "-")));
-        //we want to convert something like 2015/04/25 to 2015-04-25
-    }
-
-    @Override
-    public Top250 scrapeTop250() {
-        // This type of info doesn't exist on DMM
-        return Top250.BLANK_TOP250;
+        return defaultScrapeReleaseDate(DmmCSSQuery.Q_RDATE);
     }
 
     @Override
     public Votes scrapeVotes() {
-        Element votesElement = this.document.select(".d-review__evaluates strong").first();
-        if (votesElement != null) {
-            return new Votes(votesElement.text());
-        } else {
-            return Votes.BLANK_VOTES;
-        }
-    }
-
-    @Override
-    public Outline scrapeOutline() {
-        // TODO Auto-generated method stub
-        return Outline.BLANK_OUTLINE;
+        Element votesElement = this.document.select(DmmCSSQuery.Q_VOTE).first();
+        return  (votesElement == null)? Votes.BLANK_VOTES : new Votes(votesElement.text());
     }
 
     @Override
@@ -220,26 +177,19 @@ public class DmmParsingProfile extends SiteParsingProfile implements SpecificPro
 
         //dvd mode
         Element plotElement = this.document.select("p.mg-b20").first();
+
         if (plotElement == null || this.document.baseUri().contains("/digital/video")) {
             //video rental mode if it didnt find a match using above method
             plotElement = this.document.select("tbody .mg-b20.lh4").first();
-
-            return Option.of(new Plot(plotElement.text()));
         }
+
+        if(plotElement != null) return Option.of(new Plot(plotElement.text()));
         else return Option.none();
     }
 
     @Override
-    public Tagline scrapeTagline() {
-        return Tagline.BLANK_TAGLINE;
-    }
-
-    @Override
     public Option<Runtime> scrapeRuntime() {
-        String runtime = "";
-        Element runtimeElement = this.document.select("table.mg-b20 tr td:contains(収録時間：) + td").first();
-
-        return (runtimeElement == null) ? Option.none() : Option.of(new Runtime(runtimeElement.text().replaceAll("分", "")));
+        return defaultScrapeRuntime(DmmCSSQuery.Q_TIME);
     }
 
     @Override
@@ -291,35 +241,23 @@ public class DmmParsingProfile extends SiteParsingProfile implements SpecificPro
     }
 
     @Override
-    @Deprecated
-    public FxThumb[] scrapePosters() {
-        return null;
-    }
-
-    @Override
     public Option<FxThumb> scrapeCover() {
-        Element postersElement = this.document.select("a[name=package-image], div#sample-video img[src*=/pics.dmm.co.jp]").first();
-        String posterLink = postersElement.attr("abs:href");
-        if (posterLink != null) {
-            return FxThumb.of(posterLink);
-        }
-        return Option.none();
+        return defaultScrapeCover(DmmCSSQuery.Q_COVER);
     }
 
     @Override
-    @Deprecated
-    public FxThumb[] scrapeFanart() {
-        return null;
+    public Option<Studio> scrapeStudio() {
+        return defaultScrapeStudio(DmmCSSQuery.Q_STUDIO);
     }
 
     @Override
-    public Option<MPAARating> scrapeMPAA() {
-        return Option.of(MPAARating.RATING_XXX);
+    public Studio scrapeMaker() {
+        return defaultScrapeMaker(DmmCSSQuery.Q_MAKER);
     }
 
     @Override
     public ID scrapeID() {
-        Element idElement = this.document.select("td:containsOwn(品番：) ~ td").first();
+        Element idElement = this.document.select(DmmCSSQuery.Q_ID).first();
         if (idElement != null) {
             String idElementText = idElement.text();
             idElementText = fixUpIDFormatting(idElementText);
@@ -333,7 +271,7 @@ public class DmmParsingProfile extends SiteParsingProfile implements SpecificPro
 
     @Override
     public ArrayList<Genre> scrapeGenres() {
-        Elements genreElements = this.document.select("table.mg-b12 tr td a[href*=article=keyword/id=]");
+        Elements genreElements = this.document.select(DmmCSSQuery.Q_GENRES);
         ArrayList<Genre> genres = new ArrayList<>(genreElements.size());
         for (Element genreElement : genreElements) {
             // of the link so we can examine the id and do some sanity cleanup
@@ -342,107 +280,11 @@ public class DmmParsingProfile extends SiteParsingProfile implements SpecificPro
             String href = genreElement.attr("abs:href");
             String genreID = genreElement.attr("abs:href").substring(href.indexOf("id=") + 3, href.length() - 1);
             if (this.acceptGenreID(genreID)) {
-                if (!this.doGoogleTranslation) {
                     genres.add(new Genre(genreElement.text()));
-                } else {
-                    String potentialBetterTranslation = this.betterGenreTranslation(genreElement.text(), genreID);
-
-                    // we didn't know of anything hand picked for genres, just use
-                    // google translate
-                    if (potentialBetterTranslation.equals("")) {
-                        genres.add(new Genre(TranslateString.translateStringJapaneseToEnglish(genreElement.text())));
-                    }
-                    // Cool, we got something we want to use instead for our genre,
-                    // let's use that
-                    else {
-                        genres.add(new Genre(potentialBetterTranslation));
-                    }
-                }
             }
         }
         // system.out.println("genres" + genreElements);
         return genres;
-    }
-
-    private String betterGenreTranslation(String text, String genreID) {
-        String betterGenreTranslatedString = "";
-        switch (genreID) {
-            case "5001":
-                betterGenreTranslatedString = "Creampie";
-                break;
-            case "5002":
-                betterGenreTranslatedString = "Fellatio";
-                break;
-            case "1013":
-                betterGenreTranslatedString = "Nurse";
-                break;
-            default:
-                break;
-        }
-
-        return betterGenreTranslatedString;
-    }
-
-    private String betterActressTranslation(String text, String actressID) {
-        String betterActressTranslatedString = "";
-        switch (actressID) {
-            case "17802":
-                betterActressTranslatedString = "Tsubomi";
-                break;
-            case "27815":
-                betterActressTranslatedString = "Sakura Aida";
-                break;
-            case "1014395":
-                betterActressTranslatedString = "Yuria Ashina";
-                break;
-            case "1001819":
-                betterActressTranslatedString = "Emiri Himeno";
-                break;
-            case "1006261":
-                betterActressTranslatedString = "Uta Kohaku";
-                break;
-            case "101792":
-                betterActressTranslatedString = "Nico Nohara";
-                break;
-            case "1015472":
-                betterActressTranslatedString = "Tia";
-                break;
-            case "1016186":
-                betterActressTranslatedString = "Yuko Shiraki";
-                break;
-            case "1009910":
-                betterActressTranslatedString = "Hana Nonoka";
-                break;
-            case "1016458":
-                betterActressTranslatedString = "Eve Hoshino";
-                break;
-            case "1019676":
-                betterActressTranslatedString = "Rie Tachikawa";
-                break;
-            case "1017201":
-                betterActressTranslatedString = "Meisa Chibana";
-                break;
-            case "1018387":
-                betterActressTranslatedString = "Nami Itoshino";
-                break;
-            case "1014108":
-                betterActressTranslatedString = "Juria Tachibana";
-                break;
-            case "1016575":
-                betterActressTranslatedString = "Chika Kitano";
-                break;
-            case "24489":
-                betterActressTranslatedString = "Chichi Asada";
-                break;
-            case "20631":
-                betterActressTranslatedString = "Mitsuki An";
-                break;
-            default:
-                break;
-
-        }
-
-        return betterActressTranslatedString;
     }
 
     // Return false on any genres we don't want scraping in. This can later be
@@ -451,7 +293,8 @@ public class DmmParsingProfile extends SiteParsingProfile implements SpecificPro
     // the genreID comes from the href to the genre keyword from DMM
     // Example: <a href="/mono/dvd/-/list/=/article=keyword/id=6004/">
     // The genre ID would be 6004 which is passed in as the String
-    private boolean acceptGenreID(String genreID) {
+    @Contract(pure = true)
+    private boolean acceptGenreID(@NotNull String genreID) {
         switch (genreID) {
             case "6529": // "DVD Toaster" WTF is this? Nuke it!
             case "6984":
@@ -529,6 +372,26 @@ public class DmmParsingProfile extends SiteParsingProfile implements SpecificPro
         CompletableFuture.allOf(futures).join();
 
         return actorList;
+    }
+
+    @Override
+    public Stream<FxThumb> scrapeExtraImage() {
+        Elements extraArtElementsSmallSize = this.document.select(DmmCSSQuery.Q_THUMBS);
+
+        if (null == extraArtElementsSmallSize || extraArtElementsSmallSize.size() > 20) {
+            return Stream.empty();
+        }
+
+        // We need to do some string manipulation and put a "jp" before the
+        // last dash in the URL to of the full size picture
+        return Stream.ofAll(extraArtElementsSmallSize.stream())
+                .map((ex) -> ex.attr("abs:src"))
+                .filter(Objects::nonNull)
+                .map((s) -> s.substring(0, s.lastIndexOf('-')) + "jp" + s.substring(s.lastIndexOf('-')))
+                .peek((link) -> System.out.println("scrapeExtraArt() >> " + link))
+                .map(FxThumb::of)
+                .flatMap(Option::toStream);
+
     }
 
     @Override
@@ -641,37 +504,7 @@ public class DmmParsingProfile extends SiteParsingProfile implements SpecificPro
 
     @Override
     public ArrayList<Director> scrapeDirectors() {
-        ArrayList<Director> directors = new ArrayList<>();
-        Element directorElement = this.document.select("table.mg-b20 tr td a[href*=article=director/id=]").first();
-        if (directorElement != null && directorElement.hasText()) {
-            if (this.doGoogleTranslation) {
-                directors.add(new Director(TranslateString.translateStringJapaneseToEnglish(directorElement.text()), null));
-            } else {
-                directors.add(new Director(directorElement.text(), null));
-            }
-        }
-        return directors;
-    }
-
-    @Override
-    public Option<Studio> scrapeStudio() {
-        Element studioElement = this.document.select("table.mg-b20 tr td a[href*=article=label/id=]").first();
-
-        return (studioElement == null) ? Option.none() : Option.of(new Studio(studioElement.text()));
-    }
-
-    @Override
-    public Studio scrapeMaker() {
-        Element studioElement = this.document.select("table.mg-b20 tr td a[href*=article=maker/id=]").first();
-        if (studioElement != null) {
-            if (this.doGoogleTranslation) {
-                return new Studio(TranslateString.translateStringJapaneseToEnglish(studioElement.text()));
-            } else {
-                return new Studio(studioElement.text());
-            }
-        } else {
-            return Studio.BLANK_STUDIO;
-        }
+        return defaultScrapeDirectors(DmmCSSQuery.Q_DIRECTOR);
     }
 
     @Override
@@ -785,48 +618,6 @@ public class DmmParsingProfile extends SiteParsingProfile implements SpecificPro
         }
 
         return filteredSearchResults.toArray(new SearchResult[0]);
-
-    }
-
-    @Deprecated
-    @Override
-    public FxThumb[] scrapeExtraFanart() {
-        Elements extraArtElementsSmallSize = this.document.select("div#sample-image-block img.mg-b6");
-
-        ArrayList<FxThumb> extra = new ArrayList<>(extraArtElementsSmallSize.size());
-
-        for (Element item : extraArtElementsSmallSize) {
-            // We need to do some string manipulation and put a "jp" before the
-            // last dash in the URL to of the full size picture
-            String extraArtLinkSmall = item.attr("abs:src");
-            int indexOfLastDash = extraArtLinkSmall.lastIndexOf('-');
-            String URLpath = extraArtLinkSmall.substring(0, indexOfLastDash) + "jp" + extraArtLinkSmall.substring(indexOfLastDash);
-            //if (FxThumb.fileExistsAtUrl(URLpath)) {
-            System.out.println("scrapeExtraFanart = " + URLpath);
-            extra.add(FxThumb.of(URLpath).get());
-            //}
-
-        }
-        return extra.toArray(new FxThumb[0]);
-    }
-
-    @Override
-    public Stream<FxThumb> scrapeExtraImage() {
-        Elements extraArtElementsSmallSize = this.document.select("div#sample-image-block img.mg-b6");
-
-        if (null == extraArtElementsSmallSize || extraArtElementsSmallSize.size() > 20) {
-            return Stream.empty();
-        }
-
-        // We need to do some string manipulation and put a "jp" before the
-        // last dash in the URL to of the full size picture
-        return Stream.ofAll(extraArtElementsSmallSize.stream())
-                .map((ex) -> ex.attr("abs:src"))
-                .filter(Objects::nonNull)
-                .map((s) -> s.substring(0, s.lastIndexOf('-')) + "jp" + s.substring(s.lastIndexOf('-')))
-                .peek((link) -> System.out.println("scrapeExtraArt() >> " + link))
-                .map(FxThumb::of)
-                .flatMap(Option::toStream);
 
     }
 
