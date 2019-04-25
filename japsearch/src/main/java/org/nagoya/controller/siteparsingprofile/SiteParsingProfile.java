@@ -4,6 +4,7 @@ import io.vavr.collection.Stream;
 import io.vavr.control.Option;
 import javafx.collections.ObservableList;
 import org.apache.commons.io.FilenameUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -12,15 +13,13 @@ import org.nagoya.controller.AbstractMovieScraper;
 import org.nagoya.controller.GenericMovieScraper;
 import org.nagoya.controller.languagetranslation.Language;
 import org.nagoya.model.SearchResult;
-import org.nagoya.model.dataitem.*;
 import org.nagoya.model.dataitem.Runtime;
 import org.nagoya.model.dataitem.Set;
+import org.nagoya.model.dataitem.*;
 import org.nagoya.preferences.GeneralSettings;
 import org.nagoya.system.Systems;
 
-import javax.imageio.ImageIO;
 import javax.swing.*;
-import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.net.*;
@@ -43,6 +42,7 @@ public abstract class SiteParsingProfile implements DataItemSource {
 
     private boolean firstWordOfFileIsID = false;
     private ImageIcon profileIcon;
+
     /**
      * If this has a value when scraping, will use overridenSearchResult
      * from a user provided URL without looking at file name
@@ -291,41 +291,42 @@ public abstract class SiteParsingProfile implements DataItemSource {
 
     public abstract Option<ReleaseDate> scrapeReleaseDate();
 
-    public abstract Option<Year> scrapeYear();
-
     public abstract Option<Plot> scrapePlot();
 
     public abstract Option<Studio> scrapeStudio();
 
     public abstract Option<Runtime> scrapeRuntime();
 
-    public abstract Option<MPAARating> scrapeMPAA();
-
-    public Option<FxThumb> scrapeCover() {
-        return Option.none();
-    }
-
-    public Stream<FxThumb> scrapeExtraImage() {return Stream.empty();}
+    public abstract Option<FxThumb> scrapeCover();
 
     public abstract ArrayList<Director> scrapeDirectors();
 
     public abstract ArrayList<Genre> scrapeGenres();
 
-    public void scrapeActorsAsync(ObservableList<ActorV2> observableList) {}
+    public abstract void scrapeActorsAsync(ObservableList<ActorV2> observableList);
 
-    public abstract Top250 scrapeTop250();
+    public Stream<FxThumb> scrapeExtraImage() {return Stream.empty();}
 
-    public abstract Outline scrapeOutline();
-
-    public abstract Votes scrapeVotes();
-
-    public abstract Tagline scrapeTagline();
-
-    public abstract FxThumb[] scrapePosters();
-
-    public Trailer scrapeTrailer() {
-        return Trailer.BLANK_TRAILER;
+    public Option<MPAARating> scrapeMPAA() {
+        return Option.of(MPAARating.RATING_XXX);
     }
+
+    public Option<Year> scrapeYear() {
+        return scrapeReleaseDate().map(ReleaseDate::getYear);
+    }
+
+    public Top250 scrapeTop250() { return Top250.BLANK_TOP250; }
+
+    public Outline scrapeOutline() { return Outline.BLANK_OUTLINE; }
+
+    public Votes scrapeVotes() { return Votes.BLANK_VOTES; }
+
+    public Tagline scrapeTagline() {
+        return Tagline.BLANK_TAGLINE;
+    }
+
+    @Deprecated
+    public ArrayList<Tag> scrapeTags() { return Tag.BLANK_TAGS; }
 
     @Deprecated
     public OriginalTitle scrapeOriginalTitle() {
@@ -342,19 +343,51 @@ public abstract class SiteParsingProfile implements DataItemSource {
         return Rating.BLANK_RATING;
     };
 
-    @Deprecated
-    public abstract FxThumb[] scrapeFanart();
-
-    @Deprecated
-    public abstract FxThumb[] scrapeExtraFanart();
-
-    @Deprecated
-    public abstract ArrayList<Actor> scrapeActors();
-
-    @Deprecated
-    public ArrayList<Tag> scrapeTags() {
-        return Tag.BLANK_TAGS;
+    public Trailer scrapeTrailer() {
+        return Trailer.BLANK_TRAILER;
     }
+
+    protected Option<Set> defaultScrapeSet(String cssQuery) {
+        Element setElement = this.document.select(cssQuery).first();
+        return (setElement == null) ? Option.none() : Option.of(new Set(setElement.text()));
+    }
+
+    protected Option<ReleaseDate> defaultScrapeReleaseDate(String cssQuery) {
+        Element releaseDateElement = this.document.select(cssQuery).first();
+        return (releaseDateElement == null) ? Option.none() : Option.of(new ReleaseDate(StringUtils.replace(releaseDateElement.text(), "/", "-")));
+    }
+
+    protected Option<Runtime> defaultScrapeRuntime(String cssQuery) {
+        Element runtimeElement = this.document.select(cssQuery).first();
+        return (runtimeElement == null) ? Option.none() : Option.of(new Runtime(runtimeElement.text().replaceAll("分", "")));
+    }
+
+    protected Option<Studio> defaultScrapeStudio(String cssQuery) {
+        Element studioElement = this.document.select(cssQuery).first();
+        return (studioElement == null) ? Option.none() : Option.of(new Studio(studioElement.text()));
+    }
+
+    protected Studio defaultScrapeMaker(String cssQuery) {
+        Element studioElement = this.document.select(cssQuery).first();
+        return (studioElement == null) ? Studio.BLANK_STUDIO : new Studio(studioElement.text());
+    }
+
+    protected Option<FxThumb> defaultScrapeCover(String cssQuery) {
+        Element postersElement = this.document.select(cssQuery).first();
+        return (postersElement == null) ? Option.none() : FxThumb.of(postersElement.attr("abs:href"));
+    }
+
+    protected ArrayList<Director> defaultScrapeDirectors(String cssQuery) {
+        ArrayList<Director> directors = new ArrayList<>();
+        Element directorElement = this.document.select(cssQuery).first();
+        if (directorElement != null && directorElement.hasText()) {
+            directors.add(new Director(directorElement.text(), null));
+        }
+        return directors;
+    }
+
+    @Deprecated
+    public ArrayList<Actor> scrapeActors() { return null; }
 
 
     public abstract String createSearchString(File file, String searchStr);
