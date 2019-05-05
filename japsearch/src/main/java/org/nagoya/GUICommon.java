@@ -4,7 +4,6 @@ import com.jfoenix.controls.JFXButton;
 import com.jfoenix.controls.JFXDialog;
 import com.jfoenix.controls.JFXListView;
 import com.jfoenix.controls.JFXTextField;
-import cyclops.control.Option;
 import cyclops.control.Try;
 import de.jensd.fx.glyphs.fontawesome.FontAwesomeIcon;
 import de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView;
@@ -19,9 +18,9 @@ import javafx.scene.Node;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import org.controlsfx.control.MaskerPane;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.nagoya.preferences.GeneralSettings;
 import org.nagoya.preferences.GuiSettings;
 import org.nagoya.system.FXMLController;
 import org.nagoya.system.Systems;
@@ -46,13 +45,15 @@ public class GUICommon {
 
     private static MaskerPane progressPane = null;
 
-    public static final Boolean DEBUG_MODE = Boolean.getBoolean("debug");
+    public static final Boolean DEBUG_MODE = true;//Boolean.getBoolean("debug");
 
     private static final GuiSettings guiSettings = GuiSettings.getInstance();
-    private static final GeneralSettings preferences = GeneralSettings.getInstance();
+
 
     public static MaskerPane getProgressPane() {
-        if(null == progressPane) progressPane = new MaskerPane();
+        if (null == progressPane) {
+            progressPane = new MaskerPane();
+        }
         return progressPane;
     }
 
@@ -71,7 +72,6 @@ public class GUICommon {
     }
 
 
-
     public static Image getProgramIcon() {
         //initialize the icons used in the program
         URL programIconURL = GUICommon.class.getResource("/res/AppIcon.png");
@@ -86,14 +86,16 @@ public class GUICommon {
         return programIcon;
     }
 
-    private static <T extends FXMLController> Option<Node> loadFXML(@NotNull FXMLLoader fxmlLoader) {
-        return Try.withCatch(fxmlLoader::load, IOException.class).map(n -> (Node) n).toOption();
+    private static io.vavr.control.Option<Node> loadFXML(@NotNull FXMLLoader fxmlLoader) {
+        return io.vavr.control.Try.of(fxmlLoader::<Node>load)
+                .onFailure(Throwable::printStackTrace)
+                .toOption();
     }
 
     private static <T extends FXMLController> T getController(@NotNull FXMLLoader fxmlLoader) {
-        Option<Node> nodeOption = loadFXML(fxmlLoader);
-        Option<T> control = Option.ofNullable(fxmlLoader.getController());
-        return nodeOption.flatMap(node -> control.peek(c -> c.setPane(node))).orElse(null);
+        return loadFXML(fxmlLoader)
+                .map(node -> fxmlLoader.<T>getController().<T>setPane(node))
+                .getOrNull();
     }
 
     @Nullable
@@ -103,47 +105,36 @@ public class GUICommon {
     }
 
     @Nullable
-    public static <T extends FXMLController> T loadFXMLController(@NotNull Class<T> tClass) {
+    public static <T extends FXMLController> T loadFXMLController(@NotNull Class<T> targetClass) {
         FXMLLoader fxmlLoader = new FXMLLoader();
-        fxmlLoader.setLocation(tClass.getResource("/fxml/" + tClass.getSimpleName().replace("Control", "") + ".fxml"));
+        fxmlLoader.setLocation(targetClass.getResource("/fxml/" + targetClass.getSimpleName()
+                .replace("Control", "").replace("View", "") + ".fxml"));
         return getController(fxmlLoader);
     }
-        /*fxmlLoader.setResources();
-        try {
-            Node node = fxmlLoader.load();
-            T fxmlController = fxmlLoader.getController();
-            fxmlController.setPane(node);
-            return fxmlController;
 
-        } catch (IOException e) {
-            e.printStackTrace();
-            return null;
-        }*/
-
-    public static <T> void loadFXMLRoot(String fxml, T tClass, Node root) {
-        FXMLLoader fxmlLoader = new FXMLLoader(GUICommon.class.getResource(fxml));
-        loadFXMLRoot(fxmlLoader, tClass, root);
+    public static <T> void loadFXMLRoot(String fxml, T controller, Node root) {
+        FXMLLoader fxmlLoader = new FXMLLoader(controller.getClass().getResource(fxml));
+        loadFXMLRoot(fxmlLoader, controller, root);
     }
 
-    public static <T extends Node> void loadFXMLRoot(@NotNull T tClass) {
-        loadFXMLRoot(tClass, tClass);
+    public static <T extends Node> void loadFXMLRoot(@NotNull T controller) {
+        loadFXMLRoot(controller, controller);
     }
 
-    public static <T> void loadFXMLRoot(@NotNull T tClass, Node root) {
-        FXMLLoader fxmlLoader = new FXMLLoader(tClass.getClass().getResource("/fxml/" + tClass.getClass().getSimpleName() + ".fxml"));
-        loadFXMLRoot(fxmlLoader, tClass, root);
+    public static <T> void loadFXMLRoot(@NotNull T controller, Node root) {
+        FXMLLoader fxmlLoader = new FXMLLoader(controller.getClass().getResource("/fxml/" + controller.getClass().getSimpleName() + ".fxml"));
+        loadFXMLRoot(fxmlLoader, controller, root);
     }
 
-    private static <T> void loadFXMLRoot(@NotNull FXMLLoader fxmlLoader, T tClass, Node root) {
+    private static <T> void loadFXMLRoot(@NotNull FXMLLoader fxmlLoader, T controller, Node root) {
         fxmlLoader.setRoot(root);
-        fxmlLoader.setController(tClass);
+        fxmlLoader.setController(controller);
         loadFXML(fxmlLoader);
     }
 
-    public static Path checkAndCreateDir(Path dir)
-    {
-        if(Files.isRegularFile(dir))
-        {
+    @Contract("_ -> param1")
+    public static Path checkAndCreateDir(Path dir) {
+        if (Files.isRegularFile(dir)) {
             try {
                 Files.delete(dir);
             } catch (IOException e) {
@@ -151,7 +142,7 @@ public class GUICommon {
             }
         }
 
-        if(Files.notExists(dir)) {
+        if (Files.notExists(dir)) {
             try {
                 Files.createDirectory(dir);
             } catch (IOException e) {
@@ -188,6 +179,13 @@ public class GUICommon {
         });
     }
 
+    public static void loadImageFromLocal(Path url, double w, double h, Consumer<javafx.scene.image.Image> callWhenFinish) {
+        Systems.useExecutors(() -> {
+            javafx.scene.image.Image image = loadImageFromFile(url, w, h);
+            Platform.runLater(() -> callWhenFinish.accept(image));
+        });
+    }
+
     public static javafx.scene.image.Image loadImageFromFile(@NotNull Path path, double w, double h) {
         return Try.withResources(() -> new FileInputStream(path.toFile()),
                 stream -> new javafx.scene.image.Image(stream, w, h, true, true),
@@ -215,6 +213,18 @@ public class GUICommon {
             Platform.runLater(() -> observableListOption.peek(t -> t.add(text)));
         } else {
             observableListOption.peek(t -> t.add(text));
+        }
+    }
+
+    public static void writeToObListWithoutNewLine(String text, io.vavr.control.Option<ObservableList<String>> observableListOption) {
+        if (!Thread.currentThread().getName().equals("JavaFX Application Thread")) {
+            Platform.runLater(() -> {
+                observableListOption.filter(a -> !a.isEmpty()).peek(a -> a.remove(a.size() - 1));
+                observableListOption.peek(a -> a.add(text));
+            });
+        } else {
+            observableListOption.filter(a -> !a.isEmpty()).peek(a -> a.remove(a.size() - 1));
+            observableListOption.peek(a -> a.add(text));
         }
     }
 
@@ -279,22 +289,21 @@ public class GUICommon {
         return hBox;
     }
 
-    public static JFXListView<String> getTextArea(double width, double height, boolean autoScroll)
-    {
+    public static JFXListView<String> getTextArea(double width, double height, boolean autoScroll) {
         JFXListView<String> textArea = new JFXListView<>();
         textArea.setMinHeight(height);
         textArea.setMaxHeight(height);
         textArea.setMinWidth(width);
         textArea.setMaxWidth(width);
-        if(autoScroll) textArea.getItems().addListener((ListChangeListener<String>) c -> textArea.scrollTo(c.getList().size()-1));
+        if (autoScroll) {
+            textArea.getItems().addListener((ListChangeListener<String>) c -> textArea.scrollTo(c.getList().size() - 1));
+        }
         return textArea;
     }
 
-    public static JFXTextField getTextField(String text, double width)
-    {
+    public static JFXTextField getTextField(String text, double width) {
         JFXTextField textField = new JFXTextField(text);
-        if(width > 0)
-        {
+        if (width > 0) {
             textField.setMinWidth(width);
             textField.setMaxWidth(width);
         }
@@ -305,7 +314,4 @@ public class GUICommon {
         return GUICommon.guiSettings;
     }
 
-    public static GeneralSettings getPreferences() {
-        return GUICommon.preferences;
-    }
 }
