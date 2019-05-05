@@ -1,10 +1,6 @@
 package org.nagoya.model.dataitem;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import io.vavr.control.Option;
-import io.vavr.gson.VavrGson;
-import org.nagoya.GUICommon;
 import org.nagoya.UtilCommon;
 import org.nagoya.system.Systems;
 
@@ -20,30 +16,27 @@ public class ActorV2 {
         DUGA, DMM, JAVBUS, LOCAL, NONE
     }
 
-    public static ActorV2 of(String strName)
-    {
+    public static ActorV2 LOADING_ACTOR = ActorV2.of("Loading...");
+
+    public static ActorV2 of(String strName) {
         return ActorV2.of(strName, Source.NONE, "", "", "");
     }
 
-    public static ActorV2 of(String strName, Source source, String strUrl, String imgUrl, String strDesc)
-    {
+    public static ActorV2 of(String strName, Source source, String strUrl, String imgUrl, String strDesc) {
         ActorV2 actorV2 = Systems.getActorDB().getActors().get(strName);
 
-        if(actorV2 == null)
-        {
+        if (actorV2 == null) {
             actorV2 = new ActorV2(strName, source, strUrl, imgUrl, strDesc);
             Systems.getActorDB().getActors().put(strName, actorV2);
-        }
-        else
-        {
+        } else {
             actorV2.addRecord(source, strUrl, imgUrl, strDesc);
         }
 
-        GsonBuilder builder = new GsonBuilder();
+      /*  GsonBuilder builder = new GsonBuilder();
         VavrGson.registerAll(builder);
         Gson gSon = builder.create();
         GUICommon.debugMessage(gSon.toJson(actorV2));
-
+*/
         //Systems.getActorDB().getActors().forEach((n,a)->GUICommon.debugMessage(n));
 
         return actorV2;
@@ -51,21 +44,20 @@ public class ActorV2 {
 
     private String name;
 
-    private List<Option<NetRecord>> data;
+    private final List<Option<NetRecord>> data;
 
     private Option<FxThumb> localImage = Option.none();
 
-    private Actor oldActor = null;
+    private final Actor oldActor = null;
 
-    private ActorV2(String strName, Source siteID, String url, String imgUrl, String desc)
-    {
-        data = new ArrayList<>();
-        clearSource();
+    private ActorV2(String strName, Source siteID, String url, String imgUrl, String desc) {
+        this.data = new ArrayList<>();
+        this.clearSource();
 
-        oldActor = new Actor(strName, "", getImage().getOrNull());
-        setName(strName);
+        //GUICommon.debugMessage("Actor2 new " + strName);
 
-        addRecord(siteID, url, imgUrl, desc);
+        this.setName(strName);
+        this.addRecord(siteID, url, imgUrl, desc);
     }
 
     public String getName() {
@@ -76,60 +68,59 @@ public class ActorV2 {
         this.name = name;
     }
 
-    public void clearSource()
-    {
-        for(int x = 0; x < Source.values().length; x++)
-        {
-            data.add(Option.none());
+    public void clearSource() {
+        for (int x = 0; x < Source.values().length; x++) {
+            this.data.add(Option.none());
         }
     }
 
-    public void setLocalImage(FxThumb imgLocal)
-    {
-        data.set(Source.LOCAL.ordinal(), Option.of(new NetRecord(Source.LOCAL, Option.of(imgLocal), "", "")));
+    public void setLocalImage(FxThumb imgLocal) {
+        //GUICommon.debugMessage("Actor2 setLocalImage " + getName());
+        this.localImage = Option.of(imgLocal);
     }
 
-    public void addRecord(Source siteID, String url, String imgUrl, String desc)
-    {
-        if(siteID == Source.NONE) return;
+    public void addRecord(Source siteID, String url, String imgUrl, String desc) {
+        if (siteID == Source.NONE) {
+            return;
+        }
 
-        GUICommon.debugMessage("Add Record = " + imgUrl);
+        //GUICommon.debugMessage("Add Record = " + imgUrl);
 
         Option<FxThumb> fxThumb = Option.none();
-        if(!Objects.equals(imgUrl, "")) fxThumb = FxThumb.of(imgUrl);
+        if (!Objects.equals(imgUrl, "")) {
+            fxThumb = FxThumb.of(imgUrl);
+        }
 
-        data.set(siteID.ordinal(), Option.of(new NetRecord(siteID, fxThumb, url, desc)));
+        this.data.set(siteID.ordinal(), Option.of(new NetRecord(siteID, fxThumb, url, desc)));
     }
 
-    public Option<FxThumb> getImage()
-    {
-        return getImage(localImage);
+    public Option<FxThumb> getImage() {
+        //GUICommon.debugMessage("Actor2 getImage " + getName());
+        return this.getImage(this.localImage);
     }
 
-    public Option<FxThumb> getNetImage()
-    {
-        return getImage(Option.none());
+    public Option<FxThumb> getNetImage() {
+        //GUICommon.debugMessage("Actor2 getNetImage " + getName());
+        return this.getImage(Option.none());
     }
 
-    private Option<FxThumb> getImage(Option<FxThumb> fxThumbs)
-    {
-        for(Option<NetRecord> record : data)
-        {
-            if(fxThumbs.isEmpty()) fxThumbs = record.map(NetRecord::getActorImage).getOrElse(Option.none());
+    private Option<FxThumb> getImage(Option<FxThumb> fxThumbs) {
+        for (Option<NetRecord> record : this.data) {
+            if (fxThumbs.isEmpty()) {
+                fxThumbs = record.map(NetRecord::getActorImage).getOrElse(Option.none());
+            }
         }
 
         return fxThumbs;
     }
 
     @Deprecated
-    public Actor getActor()
-    {
-        return oldActor;
+    public Actor getActor() {
+        return this.oldActor;
     }
 
-    public void writeImageToFile(File fileNameToWrite) throws IOException
-    {
-        getImage().peek(t-> UtilCommon.saveFile(t.getThumbURL(), fileNameToWrite, null));
+    public void writeImageToFile(File fileNameToWrite) throws IOException {
+        this.getImage().peek(t -> UtilCommon.saveFile(t.getThumbURL(), fileNameToWrite, null));
     }
 
     class NetRecord {
@@ -162,6 +153,7 @@ public class ActorV2 {
             return this.desc;
         }
 
+        @Override
         public String toString() {
             return "ActorV2.NetRecord(siteID=" + this.siteID + ", actorImage=" + this.actorImage + ", url=" + this.url + ", desc=" + this.desc + ")";
         }

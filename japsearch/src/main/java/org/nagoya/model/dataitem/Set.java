@@ -1,10 +1,16 @@
 package org.nagoya.model.dataitem;
 
 
+import io.vavr.control.Option;
+
 public class Set extends MovieDataItem {
 
+	public static Option<Set> of(String s)
+	{
+		return (s == null)? Option.none() : Option.of(new Set(s));
+	}
+
 	private String set;
-	public static final Set BLANK_SET = new Set("");
 
 	public String getSet() {
 		return set;

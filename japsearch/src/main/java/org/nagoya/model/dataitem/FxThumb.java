@@ -1,16 +1,17 @@
 package org.nagoya.model.dataitem;
 
-import cyclops.control.Eval;
-import cyclops.control.Future;
-import cyclops.control.Try;
+import io.vavr.concurrent.Future;
 import io.vavr.control.Option;
+import io.vavr.control.Try;
 import javafx.embed.swing.SwingFXUtils;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import javafx.scene.image.WritableImage;
 import org.jetbrains.annotations.NotNull;
 import org.nagoya.FileDownloaderUtilities;
 import org.nagoya.GUICommon;
+import org.nagoya.system.ExecuteSystem;
 import org.nagoya.system.Systems;
 
 import javax.imageio.ImageIO;
@@ -20,15 +21,10 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
 import java.nio.file.Path;
 import java.util.Objects;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.SynchronousQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 public class FxThumb extends MovieDataItem {
@@ -36,12 +32,15 @@ public class FxThumb extends MovieDataItem {
     private static final long serialVersionUID = -5172283156078860446L;
 
     private Option<URL> thumbURL = Option.none();
-    private Option<File> localPath = Option.none();
-    private boolean loadAsync = true;
+    private Option<Path> localPath = Option.none();
+    private Option<String> strCookie = Option.none();
+
+    private transient Future<Image> imageFuture = null;
+
     private double widthLimit = 0;
     private double heightLimit = 0;
 
-    private Eval<Image> fximage = Eval.later(this::loadLazy).mergeMap(i -> i);
+    // private Eval<Image> fximage = Eval.later(this::tryLoadImage).mergeMap(i -> i);
 
     private String thumbLabel = "";
 
@@ -66,28 +65,29 @@ public class FxThumb extends MovieDataItem {
     }
 
     public static Option<FxThumb> of(String url) {
-        return Try.withCatch(() -> new URL(url), MalformedURLException.class)
+        return Try.of(() -> new URL(url) /* MalformedURLException.class*/)
                 .map(FxThumb::of)
                 .peek(t -> {
                     if (url.startsWith("file:")) {
-                        t.setLocalPath(new File(URI.create(url)));
+                        t.setLocalPath(new File(URI.create(url)).toPath());
                     }
                 })
-                .fold(Option::some, Option::none);
+                .onFailure(Throwable::printStackTrace)
+                .toOption();
     }
 
-    public static FxThumb of(Path url) {
-        FxThumb thumb = FxThumb.of(url.toFile());
-        thumb.setThumbURL(Try.withCatch(() -> url.toUri().toURL(), MalformedURLException.class).fold(Option::some, Option::none));
-        return thumb;
-    }
-
-    public static FxThumb of(File url) {
+    public static FxThumb of(Path path) {
         FxThumb thumb = new FxThumb();
-        thumb.setLocalPath(url);
-        thumb.setThumbURL(Try.withCatch(() -> url.toURI().toURL(), MalformedURLException.class).fold(Option::some, Option::none));
+        thumb.setLocalPath(path);
+        thumb.setThumbURL(Try.of(() -> path.toUri().toURL()).onFailure(Throwable::printStackTrace).toOption());
         return thumb;
     }
+
+    public static FxThumb of(File file) {
+        return FxThumb.of(file.toPath());
+    }
+
+    public static final WritableImage EMPTY_IMAGE = new WritableImage(10, 10);
 
     /**
      * Utility function to of the last part of a URL formatted string (the filename) and return it. Usually used in conjunction with
@@ -196,24 +196,49 @@ public class FxThumb extends MovieDataItem {
         return new Rectangle2D(width - croppedWidth, 0, croppedWidth, height);
     }
 
-    public static Try<Image, Exception> loadImageFromFile(@NotNull File path, double w, double h) {
+    public static cyclops.control.Try<Image, Exception> loadImageFromFileCyclop(@NotNull Path path, double w, double h) {
         //GUICommon.debugMessage("FxThumb loadImageFromFile ");
-        return cyclops.control.Try.withResources(() -> new FileInputStream(path),
+        return cyclops.control.Try.withResources(() -> new FileInputStream(path.toFile()),
                 stream -> new javafx.scene.image.Image(stream, w, h, true, true),
                 Exception.class)
                 .onFail((e) -> GUICommon.debugMessage("loadImageFromFile >> File not found : " + path.toString()))
                 ;
     }
 
-    public static Try<Image, Exception> loadImageFromURL(@NotNull URL url, double w, double h) {
-        //GUICommon.debugMessage("FxThumb loadImageFromURL >> " + url.toString());
+    public static cyclops.control.Try<Image, Exception> loadImageFromURLCyclop(@NotNull URL url, double w, double h, Option<String> strCookie) {
+
         return cyclops.control.Try.withCatch(url::openConnection, Exception.class)
                 .peek(conn -> conn.setRequestProperty("User-Agent", "Wget/1.13.4 (linux-gnu)"))
                 .peek(conn -> conn.setRequestProperty("Referer", GUICommon.customReferrer(url, null)))
+                .peek(conn -> conn.setRequestProperty("Cookie", strCookie.getOrElse("")))
                 .flatMap(conn -> cyclops.control.Try.withResources(conn::getInputStream,
                         stream -> new javafx.scene.image.Image(stream, w, h, true, true),
                         Exception.class))
                 .onFail((e) -> GUICommon.debugMessage("FxThumb loadImageFromURL >> Cannot of image from : " + url.toString()))
+                //.peek(t->GUICommon.debugMessage("FX loadImageFromURL Done"))
+                ;
+    }
+
+    public static Try<Image> loadImageFromFile(@NotNull Path path, double w, double h) {
+        //GUICommon.debugMessage("FxThumb loadImageFromFile ");
+        return io.vavr.control.Try.withResources(() -> new FileInputStream(path.toFile()))
+                .of(stream -> new javafx.scene.image.Image(stream, w, h, true, true))
+                .onFailure((e) -> GUICommon.debugMessage("loadImageFromFile >> File not found : " + path.toString()))
+                ;
+    }
+
+    public static Try<Image> loadImageFromURL(@NotNull URL url, double w, double h, Option<String> strCookie) {
+
+        return io.vavr.control.Try.of(url::openConnection)
+                .peek(conn -> conn.setRequestProperty("User-Agent", "Wget/1.13.4 (linux-gnu)"))
+                .peek(conn -> conn.setRequestProperty("Referer", GUICommon.customReferrer(url, null)))
+                .peek(conn -> conn.setRequestProperty("Cookie", strCookie.getOrElse("")))
+                .flatMap(
+                        conn -> io.vavr.control.Try.withResources(conn::getInputStream).of(
+                                stream -> new javafx.scene.image.Image(stream, w, h, true, true))
+                )
+                .onFailure((e) -> GUICommon.debugMessage("FxThumb loadImageFromURL >> Cannot of image from : " + url.toString()))
+                .onSuccess(t -> GUICommon.debugMessage("FX loadImageFromURL Done"))
                 ;
     }
 
@@ -234,6 +259,24 @@ public class FxThumb extends MovieDataItem {
         }
     }
 
+    public static void fitImageView(@NotNull ImageView view, Image img, Option<Double> maxWidth, Option<Double> maxHeight) {
+        view.setImage(img);
+        view.setPreserveRatio(true);
+
+        if (img != null) {
+            maxWidth.peek(mw -> {
+                if (img.getWidth() > mw) {
+                    view.setFitWidth(mw);
+                }
+            });
+            maxHeight.peek(mh -> {
+                if (img.getHeight() > mh) {
+                    view.setFitHeight(mh);
+                }
+            });
+        }
+    }
+
     public static void writeToFile(Image image, File file) {
         BufferedImage bufImageARGB = SwingFXUtils.fromFXImage(image, null);
         BufferedImage bufImageRGB = new BufferedImage(bufImageARGB.getWidth(), bufImageARGB.getHeight(), BufferedImage.OPAQUE);
@@ -250,81 +293,87 @@ public class FxThumb extends MovieDataItem {
         graphics.dispose();
     }
 
-    private static ExecutorService currentThreadExecutorService() {
-        ThreadPoolExecutor.CallerRunsPolicy callerRunsPolicy = new ThreadPoolExecutor.CallerRunsPolicy();
-        return new ThreadPoolExecutor(0, 1, 0L, TimeUnit.SECONDS, new SynchronousQueue<>(), callerRunsPolicy) {
-            @Override
-            public void execute(Runnable command) {
-                callerRunsPolicy.rejectedExecution(command, this);
-            }
-        };
-    }
-
-    public void setLocalPath(File path) {
+    public void setLocalPath(Path path) {
         this.localPath = Option.of(path);
-        this.loadAsync = false;
     }
 
     public boolean isLocal() {
         return this.localPath.isDefined();
     }
 
+    /**
+     * Blocking getImage
+     */
     public Image getImage() {
-        this.loadAsync = false;
-        return this.fximage.get();
-    }
-
-    public void setImage(@NotNull Image image) {
-        this.fximage = Eval.eval(() -> image);
+        if (this.imageFuture == null) {
+            this.imageFuture = this.loadImage();
+        }
+        return this.imageFuture.get();
     }
 
     /**
-     * load the image (use a file to replace the url)
-     *
-     * @param imageConsumer if null then run on current thread, otherwise on background thread
+     * non-blocking getImage
      */
-    public void getImageLocal(@NotNull File path, Consumer<Image> imageConsumer) {
-        this.setLocalPath(path);
-        //GUICommon.debugMessage("getImageLocal");
-        if (imageConsumer != null) {
-            this.fximage.forEach(imageConsumer);
-        }
-    }
-
     public void getImage(Consumer<Image> imageConsumer) {
         //GUICommon.debugMessage("getImage");
         if (imageConsumer != null) {
-            this.fximage.forEach(imageConsumer);
+            if (this.imageFuture == null) {
+                this.imageFuture = this.loadImage();
+            }
+            this.imageFuture.peek(imageConsumer);
         }
     }
 
     public void fitInImageView(ImageView view, Option<Double> maxWidth, Option<Double> maxHeight) {
         this.getImage((img) -> {
-            view.setImage(img);
-            view.setPreserveRatio(true);
-
-            maxWidth.peek(mw -> {
-                if (img.getWidth() > mw) {
-                    view.setFitWidth(mw);
-                }
-            });
-            maxHeight.peek(mh -> {
-                if (img.getHeight() > mh) {
-                    view.setFitHeight(mh);
-                }
-            });
+            fitImageView(view, img, maxWidth, maxHeight);
         });
     }
 
-    private Future<Image> loadLazy() {
+    public void setImage(@NotNull Image image) {
+        this.imageFuture = Future.successful(image);
+    }
+
+    public void releaseMemory() {
+        this.imageFuture = null;
+    }
+
+    private Future<Image> loadImage() {
+        return this.isLocal() ? this.loadSync() : this.loadAsync();
+    }
+
+    @NotNull
+    private Future<Image> loadSync() {
+        return Future.fromTry(this.tryLoadImage());
+    }
+
+    @NotNull
+    private Future<Image> loadAsync() {
+        return Future.of(Systems.getExecutorServices(ExecuteSystem.role.IMAGE), () -> this.tryLoadImage().getOrElse(EMPTY_IMAGE));
+    }
+
+    private Try<Image> tryLoadImage() {
+        return this.isLocal()
+                ?
+                loadImageFromFile(this.localPath.get(), this.widthLimit, this.heightLimit)
+                :
+                loadImageFromURL(this.thumbURL.get(), this.widthLimit, this.heightLimit, this.strCookie)
+                ;
+    }
+/*
+    private Future<Image> tryLoadImage() {
         //ExecutorService es = loadAsync ? GUICommon.getExecutorServices() : currentThreadExecutorService();
         // return loadAsync ?
         //         Future.async(GUICommon.getExecutorServices(),this::loadImage).flatMap(r->r) : loadImage();
 
         return this.localPath.isDefined() ?
                 Future.fromTry(loadImageFromFile(this.localPath.get(), this.widthLimit, this.heightLimit)) :
-                Future.of(() -> loadImageFromURL(this.thumbURL.get(), this.widthLimit, this.heightLimit), Systems.getExecutorServices()).mergeMap(i -> i);
+                //Future.fromTry(loadImageFromURL(this.thumbURL.get(), this.widthLimit, this.heightLimit));
+                Future.of(() -> {
+                    return loadImageFromURL(this.thumbURL.get(), this.widthLimit, this.heightLimit).peek(r->GUICommon.debugMessage("Lazy Done"));
+                }, Systems.getExecutorServices()).mergeMap(i -> i);
     }
+*/
 
     /**
      * Write the current stored image to file, if not yet exist then load it first
@@ -368,13 +417,6 @@ public class FxThumb extends MovieDataItem {
         this.thumbURL = Option.of(url);
     }
 
-    /**
-     * @return true if this thumb already exist in the cache and doesn't need to be downloaded again, false otherwise
-     */
-    public boolean isCached() {
-        return this.fximage.isPresent();
-    }
-
     @Override
     public String toXML() {
         return "<thumb>" + this.thumbURL.map(URL::getPath) + "</thumb>";
@@ -400,48 +442,8 @@ public class FxThumb extends MovieDataItem {
 
     }
 
-    public boolean equals(final Object o) {
-        if (o == this) return true;
-        if (!(o instanceof FxThumb)) return false;
-        final FxThumb other = (FxThumb) o;
-        if (!other.canEqual((Object) this)) return false;
-        final Object this$thumbURL = this.getThumbURL();
-        final Object other$thumbURL = other.getThumbURL();
-        if (this$thumbURL == null ? other$thumbURL != null : !this$thumbURL.equals(other$thumbURL)) return false;
-        final Object this$localPath = this.localPath;
-        final Object other$localPath = other.localPath;
-        if (this$localPath == null ? other$localPath != null : !this$localPath.equals(other$localPath)) return false;
-        if (Double.compare(this.widthLimit, other.widthLimit) != 0) return false;
-        if (Double.compare(this.heightLimit, other.heightLimit) != 0) return false;
-        final Object this$thumbLabel = this.thumbLabel;
-        final Object other$thumbLabel = other.thumbLabel;
-        if (this$thumbLabel == null ? other$thumbLabel != null : !this$thumbLabel.equals(other$thumbLabel))
-            return false;
-        return true;
-    }
-
-    protected boolean canEqual(final Object other) {
-        return other instanceof FxThumb;
-    }
-
-    public int hashCode() {
-        final int PRIME = 59;
-        int result = 1;
-        final Object $thumbURL = this.getThumbURL();
-        result = result * PRIME + ($thumbURL == null ? 43 : $thumbURL.hashCode());
-        final Object $localPath = this.localPath;
-        result = result * PRIME + ($localPath == null ? 43 : $localPath.hashCode());
-        final long $widthLimit = Double.doubleToLongBits(this.widthLimit);
-        result = result * PRIME + (int) ($widthLimit >>> 32 ^ $widthLimit);
-        final long $heightLimit = Double.doubleToLongBits(this.heightLimit);
-        result = result * PRIME + (int) ($heightLimit >>> 32 ^ $heightLimit);
-        final Object $thumbLabel = this.thumbLabel;
-        result = result * PRIME + ($thumbLabel == null ? 43 : $thumbLabel.hashCode());
-        return result;
-    }
-
-    public Option<File> getLocalPath() {
-        return this.localPath;
+    public Path getLocalPath() {
+        return this.localPath.getOrNull();
     }
 
     public String getThumbLabel() {
@@ -462,5 +464,9 @@ public class FxThumb extends MovieDataItem {
 
     public void setThumbLabel(String thumbLabel) {
         this.thumbLabel = thumbLabel;
+    }
+
+    public void setCookie(String cookie) {
+        this.strCookie = Option.of(cookie);
     }
 }
