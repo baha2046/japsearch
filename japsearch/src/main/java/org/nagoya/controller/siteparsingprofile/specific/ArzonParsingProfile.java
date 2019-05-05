@@ -1,9 +1,8 @@
 package org.nagoya.controller.siteparsingprofile.specific;
 
 import io.vavr.collection.Stream;
+import io.vavr.concurrent.Future;
 import io.vavr.control.Option;
-import javafx.application.Platform;
-import javafx.collections.ObservableList;
 import org.apache.commons.codec.net.URLCodec;
 import org.apache.commons.lang3.StringUtils;
 import org.jsoup.Jsoup;
@@ -17,6 +16,7 @@ import org.nagoya.model.SearchResult;
 import org.nagoya.model.dataitem.Runtime;
 import org.nagoya.model.dataitem.*;
 import org.nagoya.preferences.GeneralSettings;
+import org.nagoya.system.ExecuteSystem;
 import org.nagoya.system.Systems;
 
 import java.io.File;
@@ -28,7 +28,7 @@ import java.util.List;
 import java.util.Objects;
 
 public class ArzonParsingProfile extends SiteParsingProfile implements SpecificProfile {
-    private boolean doGoogleTranslation;
+    private final boolean doGoogleTranslation;
     private URL refererURL;
 
     public ArzonParsingProfile() {
@@ -104,7 +104,7 @@ public class ArzonParsingProfile extends SiteParsingProfile implements SpecificP
 
     @Override
     public Option<Set> scrapeSet() {
-        return defaultScrapeSet(ArzonCSSQuery.Q_SET);
+        return this.defaultScrapeSet(ArzonCSSQuery.Q_SET);
     }
 
     @Override
@@ -132,7 +132,7 @@ public class ArzonParsingProfile extends SiteParsingProfile implements SpecificP
 
     @Override
     public Option<Runtime> scrapeRuntime() {
-        return defaultScrapeRuntime(ArzonCSSQuery.Q_TIME);
+        return this.defaultScrapeRuntime(ArzonCSSQuery.Q_TIME);
     }
 
     @Override
@@ -142,7 +142,7 @@ public class ArzonParsingProfile extends SiteParsingProfile implements SpecificP
 
     @Override
     public Option<FxThumb> scrapeCover() {
-        return defaultScrapeCover(ArzonCSSQuery.Q_COVER);
+        return this.defaultScrapeCover(ArzonCSSQuery.Q_COVER);
     }
 
     @Override
@@ -215,12 +215,15 @@ public class ArzonParsingProfile extends SiteParsingProfile implements SpecificP
     }
 
     @Override
-    public void scrapeActorsAsync(ObservableList<ActorV2> observableList) {
-        Element actressIDElements = this.document.select(ArzonCSSQuery.Q_ACTORS).first();
-        Elements actressURL = actressIDElements.select("a");
+    public Future<List<ActorV2>> scrapeActorsAsync() {
+        return Future.of(Systems.getExecutorServices(ExecuteSystem.role.NORMAL), () ->
+        {
+            List<ActorV2> observableList = new ArrayList<>();
 
-        for (Element actressIDLink : actressURL) {
-            Systems.useExecutors(() -> {
+            Element actressIDElements = this.document.select(ArzonCSSQuery.Q_ACTORS).first();
+            Elements actressURL = actressIDElements.select("a");
+
+            for (Element actressIDLink : actressURL) {
                 String actressIDHref = actressIDLink.attr("abs:href");
                 String actressName = actressIDLink.text();
 
@@ -228,24 +231,26 @@ public class ArzonParsingProfile extends SiteParsingProfile implements SpecificP
 
                 GUICommon.debugMessage("scrapeActorsAsync() >> " + actressName + " " + actressIDHref);
 
-                Platform.runLater(() -> observableList.add(actor));
-            });
-        }
+                observableList.add(actor);
+            }
+
+            return observableList;
+        });
     }
 
     @Override
     public ArrayList<Director> scrapeDirectors() {
-        return defaultScrapeDirectors(ArzonCSSQuery.Q_DIRECTOR);
+        return this.defaultScrapeDirectors(ArzonCSSQuery.Q_DIRECTOR);
     }
 
     @Override
     public Option<Studio> scrapeStudio() {
-        return defaultScrapeStudio(ArzonCSSQuery.Q_STUDIO);
+        return this.defaultScrapeStudio(ArzonCSSQuery.Q_STUDIO);
     }
 
     @Override
     public Studio scrapeMaker() {
-        return defaultScrapeMaker(ArzonCSSQuery.Q_MAKER);
+        return this.defaultScrapeMaker(ArzonCSSQuery.Q_MAKER);
     }
 
     @Override

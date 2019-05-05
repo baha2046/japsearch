@@ -1,9 +1,8 @@
 package org.nagoya.controller.siteparsingprofile.specific;
 
 import io.vavr.collection.Stream;
+import io.vavr.concurrent.Future;
 import io.vavr.control.Option;
-import javafx.application.Platform;
-import javafx.collections.ObservableList;
 import org.apache.commons.codec.net.URLCodec;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.Contract;
@@ -21,6 +20,7 @@ import org.nagoya.model.dataitem.Runtime;
 import org.nagoya.model.dataitem.Set;
 import org.nagoya.model.dataitem.*;
 import org.nagoya.preferences.GeneralSettings;
+import org.nagoya.system.ExecuteSystem;
 import org.nagoya.system.Systems;
 
 import java.io.File;
@@ -34,7 +34,7 @@ import java.util.regex.Pattern;
 public class DmmParsingProfile extends SiteParsingProfile implements SpecificProfile {
 
     final static double dmmMaxRating = 5.00;
-    private boolean doGoogleTranslation;
+    private final boolean doGoogleTranslation;
     private boolean scrapeTrailers;
 
     public DmmParsingProfile() {
@@ -140,15 +140,16 @@ public class DmmParsingProfile extends SiteParsingProfile implements SpecificPro
     @Override
     public Title scrapeTitle() {
         Element titleElement = this.document.select(DmmCSSQuery.Q_TITLE).first();
-        if (titleElement != null)
-            return new Title(titleElement.attr("content").toString());
-        else
+        if (titleElement != null) {
+            return new Title(titleElement.attr("content"));
+        } else {
             return new Title("");
+        }
     }
 
     @Override
     public Option<Set> scrapeSet() {
-        return defaultScrapeSet(DmmCSSQuery.Q_SET);
+        return this.defaultScrapeSet(DmmCSSQuery.Q_SET);
     }
 
     @Override
@@ -163,13 +164,13 @@ public class DmmParsingProfile extends SiteParsingProfile implements SpecificPro
 
     @Override
     public Option<ReleaseDate> scrapeReleaseDate() {
-        return defaultScrapeReleaseDate(DmmCSSQuery.Q_RDATE);
+        return this.defaultScrapeReleaseDate(DmmCSSQuery.Q_RDATE);
     }
 
     @Override
     public Votes scrapeVotes() {
         Element votesElement = this.document.select(DmmCSSQuery.Q_VOTE).first();
-        return  (votesElement == null)? Votes.BLANK_VOTES : new Votes(votesElement.text());
+        return (votesElement == null) ? Votes.BLANK_VOTES : new Votes(votesElement.text());
     }
 
     @Override
@@ -183,13 +184,16 @@ public class DmmParsingProfile extends SiteParsingProfile implements SpecificPro
             plotElement = this.document.select("tbody .mg-b20.lh4").first();
         }
 
-        if(plotElement != null) return Option.of(new Plot(plotElement.text()));
-        else return Option.none();
+        if (plotElement != null) {
+            return Option.of(new Plot(plotElement.text()));
+        } else {
+            return Option.none();
+        }
     }
 
     @Override
     public Option<Runtime> scrapeRuntime() {
-        return defaultScrapeRuntime(DmmCSSQuery.Q_TIME);
+        return this.defaultScrapeRuntime(DmmCSSQuery.Q_TIME);
     }
 
     @Override
@@ -242,17 +246,17 @@ public class DmmParsingProfile extends SiteParsingProfile implements SpecificPro
 
     @Override
     public Option<FxThumb> scrapeCover() {
-        return defaultScrapeCover(DmmCSSQuery.Q_COVER);
+        return this.defaultScrapeCover(DmmCSSQuery.Q_COVER);
     }
 
     @Override
     public Option<Studio> scrapeStudio() {
-        return defaultScrapeStudio(DmmCSSQuery.Q_STUDIO);
+        return this.defaultScrapeStudio(DmmCSSQuery.Q_STUDIO);
     }
 
     @Override
     public Studio scrapeMaker() {
-        return defaultScrapeMaker(DmmCSSQuery.Q_MAKER);
+        return this.defaultScrapeMaker(DmmCSSQuery.Q_MAKER);
     }
 
     @Override
@@ -280,7 +284,7 @@ public class DmmParsingProfile extends SiteParsingProfile implements SpecificPro
             String href = genreElement.attr("abs:href");
             String genreID = genreElement.attr("abs:href").substring(href.indexOf("id=") + 3, href.length() - 1);
             if (this.acceptGenreID(genreID)) {
-                    genres.add(new Genre(genreElement.text()));
+                genres.add(new Genre(genreElement.text()));
             }
         }
         // system.out.println("genres" + genreElements);
@@ -298,6 +302,8 @@ public class DmmParsingProfile extends SiteParsingProfile implements SpecificPro
         switch (genreID) {
             case "6529": // "DVD Toaster" WTF is this? Nuke it!
             case "6984":
+            case "6983":
+            case "6976":
                 return false;
             case "6102": // "Sample Video" This is not a genre!
                 return false;
@@ -345,7 +351,7 @@ public class DmmParsingProfile extends SiteParsingProfile implements SpecificPro
                     }
 
                 } catch (SocketTimeoutException e) {
-                    System.err.println("Cannot download from " + actressPageURL.toString() + ": Socket timed out: " + e.getLocalizedMessage());
+                    System.err.println("Cannot download from " + actressPageURL + ": Socket timed out: " + e.getLocalizedMessage());
                 } catch (IOException e) {
                     // TODO Auto-generated catch block
                     e.printStackTrace();
@@ -395,13 +401,16 @@ public class DmmParsingProfile extends SiteParsingProfile implements SpecificPro
     }
 
     @Override
-    public void scrapeActorsAsync(ObservableList<ActorV2> observableList) {
-        Elements actressIDElements = this.document.select("span#performer a[href*=article=actress/id=]");
+    public Future<List<ActorV2>> scrapeActorsAsync() {
 
-        for (Element actressIDLink : actressIDElements) {
+        return Future.of(Systems.getExecutorServices(ExecuteSystem.role.NORMAL), () ->
+        {
+            List<ActorV2> observableList = new ArrayList<>();
 
-            Systems.useExecutors(() ->
-            {
+            Elements actressIDElements = this.document.select("span#performer a[href*=article=actress/id=]");
+
+            for (Element actressIDLink : actressIDElements) {
+
                 String actressIDHref = actressIDLink.attr("abs:href");
                 String actressNameKanji = actressIDLink.text();
 
@@ -432,29 +441,30 @@ public class DmmParsingProfile extends SiteParsingProfile implements SpecificPro
 
                     ActorV2 actorV2 = ActorV2.of(actressNameKanji, ActorV2.Source.DMM, actressPageURL, actressThumbnailPath, "");
                     //actor.setImageIcon(actorThumb.getImage());
-                    Platform.runLater(() -> {
-                        observableList.add(actorV2);
-                    });
+                    observableList.add(actorV2);
 
                 } catch (SocketTimeoutException e) {
-                    System.err.println("Cannot download from " + actressPageURL.toString() + ": Socket timed out: " + e.getLocalizedMessage());
+                    System.err.println("Cannot download from " + actressPageURL + ": Socket timed out: " + e.getLocalizedMessage());
                 } catch (IOException e) {
                     // TODO Auto-generated catch block
                     e.printStackTrace();
                 }
-            });
 
-            //Get actors that are just a "Name" and have no page of their own (common on some web releases)
-            Elements nameOnlyActors = this.document.select("table.mg-b20 tr td:contains(�??�?：) + td");
-            for (Element currentNameOnlyActor : nameOnlyActors) {
-                String actorName = currentNameOnlyActor.text().trim();
-                //for some reason, they sometimes list the age of the person after their name, so let's of rid of that
-                actorName = actorName.replaceFirst("\\([0-9]{2}\\)", "");
+                //Get actors that are just a "Name" and have no page of their own (common on some web releases)
+                Elements nameOnlyActors = this.document.select("table.mg-b20 tr td:contains(�??�?：) + td");
+                for (Element currentNameOnlyActor : nameOnlyActors) {
+                    String actorName = currentNameOnlyActor.text().trim();
+                    //for some reason, they sometimes list the age of the person after their name, so let's of rid of that
+                    actorName = actorName.replaceFirst("\\([0-9]{2}\\)", "");
 
-                ActorV2 actorV2 = ActorV2.of(actorName);
-                observableList.add(actorV2);
+                    ActorV2 actorV2 = ActorV2.of(actorName);
+                    observableList.add(actorV2);
+                }
             }
-        }
+
+            return observableList;
+        });
+
     }
 
     public static ActorV2 scrapeActorThumbFromDmm(String actorName) {
@@ -485,8 +495,9 @@ public class DmmParsingProfile extends SiteParsingProfile implements SpecificPro
                         if (imgPath.contains("thumbnail/")) {
                             imgPath = imgPath.replaceAll("thumbnail/", "");
                         }
+                    } else {
+                        imgPath = "";
                     }
-                    else imgPath = "";
 
                     System.out.println("scrapeActorThumbFromDmm() >> " + imgPath);
                     return ActorV2.of(actorName, ActorV2.Source.DMM, dmmUrl, imgPath, "");
@@ -504,7 +515,7 @@ public class DmmParsingProfile extends SiteParsingProfile implements SpecificPro
 
     @Override
     public ArrayList<Director> scrapeDirectors() {
-        return defaultScrapeDirectors(DmmCSSQuery.Q_DIRECTOR);
+        return this.defaultScrapeDirectors(DmmCSSQuery.Q_DIRECTOR);
     }
 
     @Override

@@ -1,8 +1,8 @@
 package org.nagoya.controller.siteparsingprofile;
 
 import io.vavr.collection.Stream;
+import io.vavr.concurrent.Future;
 import io.vavr.control.Option;
-import javafx.collections.ObservableList;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.jsoup.Jsoup;
@@ -210,7 +210,7 @@ public abstract class SiteParsingProfile implements DataItemSource {
     }
 
     public static Document downloadDocumentFromURLString(String url) {
-        return downloadDocumentFromURLString(url,"Mozilla");
+        return downloadDocumentFromURLString(url, "Mozilla");
     }
 
     public static Document downloadDocumentFromURLString(String url, String strAgent) {
@@ -303,30 +303,40 @@ public abstract class SiteParsingProfile implements DataItemSource {
 
     public abstract ArrayList<Genre> scrapeGenres();
 
-    public abstract void scrapeActorsAsync(ObservableList<ActorV2> observableList);
+    public abstract Future<List<ActorV2>> scrapeActorsAsync();
 
-    public Stream<FxThumb> scrapeExtraImage() {return Stream.empty();}
+    public Stream<FxThumb> scrapeExtraImage() {
+        return Stream.empty();
+    }
 
     public Option<MPAARating> scrapeMPAA() {
         return Option.of(MPAARating.RATING_XXX);
     }
 
     public Option<Year> scrapeYear() {
-        return scrapeReleaseDate().map(ReleaseDate::getYear);
+        return this.scrapeReleaseDate().map(ReleaseDate::getYear);
     }
 
-    public Top250 scrapeTop250() { return Top250.BLANK_TOP250; }
+    public Top250 scrapeTop250() {
+        return Top250.BLANK_TOP250;
+    }
 
-    public Outline scrapeOutline() { return Outline.BLANK_OUTLINE; }
+    public Outline scrapeOutline() {
+        return Outline.BLANK_OUTLINE;
+    }
 
-    public Votes scrapeVotes() { return Votes.BLANK_VOTES; }
+    public Votes scrapeVotes() {
+        return Votes.BLANK_VOTES;
+    }
 
     public Tagline scrapeTagline() {
         return Tagline.BLANK_TAGLINE;
     }
 
     @Deprecated
-    public ArrayList<Tag> scrapeTags() { return Tag.BLANK_TAGS; }
+    public ArrayList<Tag> scrapeTags() {
+        return Tag.BLANK_TAGS;
+    }
 
     @Deprecated
     public OriginalTitle scrapeOriginalTitle() {
@@ -335,13 +345,13 @@ public abstract class SiteParsingProfile implements DataItemSource {
 
     @Deprecated
     public SortTitle scrapeSortTitle() {
-        return  SortTitle.BLANK_SORTTITLE;
+        return SortTitle.BLANK_SORTTITLE;
     }
 
     @Deprecated
     public Rating scrapeRating() {
         return Rating.BLANK_RATING;
-    };
+    }
 
     public Trailer scrapeTrailer() {
         return Trailer.BLANK_TRAILER;
@@ -387,14 +397,16 @@ public abstract class SiteParsingProfile implements DataItemSource {
     }
 
     @Deprecated
-    public ArrayList<Actor> scrapeActors() { return null; }
+    public ArrayList<Actor> scrapeActors() {
+        return null;
+    }
 
 
     public abstract String createSearchString(File file, String searchStr);
 
     public String createSearchString(File file) {
         String fileNameNoExtension = findIDTagFromFile(file, this.isFirstWordOfFileIsID());
-        return createSearchString(file, fileNameNoExtension);
+        return this.createSearchString(file, fileNameNoExtension);
     }
 
 

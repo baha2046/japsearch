@@ -1,9 +1,8 @@
 package org.nagoya.controller.siteparsingprofile.specific;
 
 import io.vavr.collection.Stream;
+import io.vavr.concurrent.Future;
 import io.vavr.control.Option;
-import javafx.application.Platform;
-import javafx.collections.ObservableList;
 import org.apache.commons.codec.net.URLCodec;
 import org.apache.commons.lang3.StringUtils;
 import org.jsoup.Jsoup;
@@ -16,14 +15,17 @@ import org.nagoya.controller.siteparsingprofile.SiteParsingProfile;
 import org.nagoya.model.SearchResult;
 import org.nagoya.model.dataitem.Runtime;
 import org.nagoya.model.dataitem.*;
-import org.nagoya.model.dataitem.Set;
 import org.nagoya.preferences.GeneralSettings;
+import org.nagoya.system.ExecuteSystem;
 import org.nagoya.system.Systems;
 
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
 
 public class DugaParsingProfile extends SiteParsingProfile implements SpecificProfile {
     private URL refererURL;
@@ -91,7 +93,7 @@ public class DugaParsingProfile extends SiteParsingProfile implements SpecificPr
 
     @Override
     public Option<Set> scrapeSet() {
-        return defaultScrapeSet(DugaCSSQuery.Q_SET);
+        return this.defaultScrapeSet(DugaCSSQuery.Q_SET);
     }
 
     @Override
@@ -207,14 +209,18 @@ public class DugaParsingProfile extends SiteParsingProfile implements SpecificPr
     }
 
     @Override
-    public void scrapeActorsAsync(ObservableList<ActorV2> observableList) {
-        Element actressIDElements = this.document.select(DugaCSSQuery.Q_ACTORS).first();
+    public Future<List<ActorV2>> scrapeActorsAsync() {
+        return Future.of(Systems.getExecutorServices(ExecuteSystem.role.NORMAL), () ->
+        {
+            List<ActorV2> observableList = new ArrayList<>();
 
-        if (actressIDElements != null) {
-            Elements actressURL = actressIDElements.select("a");
+            Element actressIDElements = this.document.select(DugaCSSQuery.Q_ACTORS).first();
 
-            for (Element actressIDLink : actressURL) {
-                Systems.useExecutors(() -> {
+            if (actressIDElements != null) {
+                Elements actressURL = actressIDElements.select("a");
+
+                for (Element actressIDLink : actressURL) {
+
                     String actressIDHref = actressIDLink.attr("abs:href");
                     String actressName = actressIDLink.text();
 
@@ -222,26 +228,28 @@ public class DugaParsingProfile extends SiteParsingProfile implements SpecificPr
 
                     GUICommon.debugMessage("scrapeActorsAsync() >> " + actressName + " " + actressIDHref);
 
-                    Platform.runLater(() -> observableList.add(actor));
-                });
+                    observableList.add(actor);
+                }
             }
-        }
+
+            return observableList;
+        });
     }
 
 
     @Override
     public ArrayList<Director> scrapeDirectors() {
-        return defaultScrapeDirectors(DugaCSSQuery.Q_DIRECTOR);
+        return this.defaultScrapeDirectors(DugaCSSQuery.Q_DIRECTOR);
     }
 
     @Override
     public Option<Studio> scrapeStudio() {
-        return defaultScrapeStudio(DugaCSSQuery.Q_STUDIO);
+        return this.defaultScrapeStudio(DugaCSSQuery.Q_STUDIO);
     }
 
     @Override
     public Studio scrapeMaker() {
-        return defaultScrapeMaker(DugaCSSQuery.Q_MAKER);
+        return this.defaultScrapeMaker(DugaCSSQuery.Q_MAKER);
     }
 
     @Override

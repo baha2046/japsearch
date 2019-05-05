@@ -1,9 +1,9 @@
 package org.nagoya.controller.siteparsingprofile.specific;
 
 import io.vavr.collection.Stream;
+import io.vavr.concurrent.Future;
 import io.vavr.control.Option;
 import javafx.application.Platform;
-import javafx.collections.ObservableList;
 import org.apache.commons.codec.net.URLCodec;
 import org.apache.commons.lang3.text.WordUtils;
 import org.jsoup.Jsoup;
@@ -17,6 +17,7 @@ import org.nagoya.controller.siteparsingprofile.SiteParsingProfile;
 import org.nagoya.model.SearchResult;
 import org.nagoya.model.dataitem.Runtime;
 import org.nagoya.model.dataitem.*;
+import org.nagoya.system.ExecuteSystem;
 import org.nagoya.system.Systems;
 
 import java.io.File;
@@ -183,10 +184,14 @@ public class JavBusParsingProfile extends SiteParsingProfile implements Specific
     }
 
     @Override
-    public void scrapeActorsAsync(ObservableList<ActorV2> observableList) {
-        Elements actorElements = this.document.select(JavBusCSSQuery.Q_ACTORS);
-        if (actorElements != null) {
-            Systems.useExecutors(() -> {
+    public Future<List<ActorV2>> scrapeActorsAsync() {
+        return Future.of(Systems.getExecutorServices(ExecuteSystem.role.NORMAL), () ->
+        {
+            List<ActorV2> observableList = new ArrayList<>();
+
+            Elements actorElements = this.document.select(JavBusCSSQuery.Q_ACTORS);
+            if (actorElements != null) {
+
                 for (Element currentActor : actorElements) {
                     String actorName = currentActor.attr("title");
                     //Sometimes for whatever reason the english page still has the name in japanaese, so I will translate it myself
@@ -201,10 +206,13 @@ public class JavBusParsingProfile extends SiteParsingProfile implements Specific
                     }
 
                     ActorV2 actor = ActorV2.of(actorName, ActorV2.Source.JAVBUS, "", actorImage, "");
-                    Platform.runLater(() -> observableList.add(actor));
+                    observableList.add(actor);
                 }
-            });
-        }
+
+            }
+
+            return observableList;
+        });
     }
 
     @Override
