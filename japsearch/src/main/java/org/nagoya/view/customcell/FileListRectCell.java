@@ -19,8 +19,8 @@ import org.nagoya.model.dataitem.FxThumb;
 import org.nagoya.model.dataitem.Studio;
 
 public class FileListRectCell extends JFXListCell<DirectoryEntry> {
-    private FXFileListCell normalRectCell;
-    private FXFileListMovieCell movieRectCell;
+    private final FXFileListCell normalRectCell;
+    private final FXFileListMovieCell movieRectCell;
 
     public FileListRectCell() {
         this.normalRectCell = new FXFileListCell();
@@ -62,7 +62,7 @@ public class FileListRectCell extends JFXListCell<DirectoryEntry> {
     }
 
     private void ShowNormal(DirectoryEntry item) {
-        this.setPrefHeight(40);
+        this.setPrefHeight(52);
         this.normalRectCell.setModel(item);
         this.normalRectCell.iconView.setImage(item.getFileIcon());
         this.setGraphic(this.normalRectCell);
@@ -74,8 +74,10 @@ public class FileListRectCell extends JFXListCell<DirectoryEntry> {
         @FXML
         private Label nameLabel;
         @FXML
+        private Label sizeLabel;
+        @FXML
         private Label typeLabel;
-        private final ObjectProperty<DirectoryEntry> model = new SimpleObjectProperty<DirectoryEntry>(this, "model") {
+        private final ObjectProperty<DirectoryEntry> model = new SimpleObjectProperty<>(this, "model") {
             private DirectoryEntry currentModel;
 
             @Override
@@ -96,7 +98,6 @@ public class FileListRectCell extends JFXListCell<DirectoryEntry> {
 
         FXFileListCell() {
             GUICommon.loadFXMLRoot(this);
-            this.iconView.setPreserveRatio(true);
         }
 
         //public final DirectoryEntry getModel() { return model.of(); }
@@ -113,12 +114,18 @@ public class FileListRectCell extends JFXListCell<DirectoryEntry> {
             } else {
                 this.dirMask.setVisible(false);
             }
+
+            if (model.getFileExtenion() != null) {
+                this.sizeLabel.setText(model.getMovieSize().map(s -> s.toString() + " MB").getOrElse(""));
+            } else {
+                this.sizeLabel.setText("");
+            }
         }
 
         void bind(DirectoryEntry model) {
             //genderImageView.imageProperty().bind(Bindings.<Image>select(modelProperty(), "gender", "image"));
             this.nameLabel.textProperty().bind(model.getFileNameProperty());
-            this.typeLabel.textProperty().bind(model.getFileExtenionProperty());
+            this.typeLabel.textProperty().bind(model.getFileExtensionProperty());
         }
 
         void unbind() {
@@ -152,13 +159,13 @@ public class FileListRectCell extends JFXListCell<DirectoryEntry> {
 
         FXFileListMovieCell() {
             GUICommon.loadFXMLRoot(this);
-            //this.initializeComponent();
-            //getStyleClass().add("user-view");
             this.imageView.setPreserveRatio(true);
         }
 
         //public final DirectoryEntry getModel() { return model.of(); }
         void setModel(DirectoryEntry model) {
+            //GUICommon.debugMessage("t" + " || " + model.getMovieData().getMovieTitle().getTitle());
+
             //this.model.set(model);
             if (model.isDirectory()) {
                 this.dirMask.setVisible(true);
@@ -180,7 +187,7 @@ public class FileListRectCell extends JFXListCell<DirectoryEntry> {
                 this.pathLabel.setText(model.getFilePath().toString());
                 if (model.getFileExtenion() != null) {
                     //   if (model.getFileExtenion().equals("Folder")) {
-                    this.typeLabel.setText(String.valueOf(model.getMovieSize()) + " MB");
+                    this.typeLabel.setText(model.getMovieSize().map(s -> s.toString() + " MB").getOrElse(""));
                     // } else {
                     //     int x = model.getFileExtenion().indexOf("/");
                     //this.typeLabel.setText(x > 0 ? model.getFileExtenion().substring(0, x) : model.getFileExtenion());

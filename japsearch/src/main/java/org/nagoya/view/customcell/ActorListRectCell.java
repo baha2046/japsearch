@@ -138,7 +138,7 @@ public class ActorListRectCell extends ListCell<ActorV2> {
             this.inActor = actor;
             this.txtName.setText(actor.getName());
             this.btnEdit.setSelected(false);
-            this.imgActor.setImage(actor.getImage().map(FxThumb::getImage).getOrNull());
+            actor.getImage().peek(t->t.getImage(imgActor::setImage)).onEmpty(()->imgActor.setImage(null));
         }
 
         public void setParent(ListCell<ActorV2> parent) {
