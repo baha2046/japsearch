@@ -1,8 +1,8 @@
 package org.nagoya.model;
 
-import cyclops.control.Try;
+import io.reactivex.Single;
+import io.reactivex.schedulers.Schedulers;
 import io.vavr.CheckedFunction0;
-import io.vavr.Tuple;
 import io.vavr.Tuple2;
 import io.vavr.collection.Stream;
 import io.vavr.collection.Vector;
@@ -16,7 +16,9 @@ import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
 import javafx.collections.ObservableList;
 import javafx.embed.swing.SwingFXUtils;
+import javafx.scene.control.TreeItem;
 import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.util.Callback;
 import org.apache.commons.io.FilenameUtils;
 import org.jetbrains.annotations.Contract;
@@ -24,94 +26,183 @@ import org.jetbrains.annotations.NotNull;
 import org.nagoya.GUICommon;
 import org.nagoya.model.dataitem.ActorV2;
 import org.nagoya.model.dataitem.FxThumb;
-import org.nagoya.model.dataitem.Title;
-import org.nagoya.preferences.GeneralSettings;
-import org.nagoya.preferences.RenameSettings;
-import org.nagoya.system.Benchmark;
-import org.nagoya.system.DirectorySystem;
+import org.nagoya.system.ExecuteSystem;
 import org.nagoya.system.Systems;
 import org.nagoya.system.cache.IconCache;
-import org.nagoya.system.cache.MovieCacheInstance;
 
 import javax.swing.*;
+import java.awt.*;
 import java.awt.image.BufferedImage;
-import java.io.*;
+import java.io.BufferedInputStream;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URLConnection;
-import java.nio.file.FileSystems;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
+import java.util.Comparator;
 import java.util.List;
 
 
-public class DirectoryEntry implements CheckedFunction0<Boolean>, Runnable {
+public class DirectoryEntry extends TreeItem<Path> implements CheckedFunction0<Boolean>, Runnable {
 
-    private static final long serialVersionUID = -2799720372564283731L;
-
-    private final Path filePath;
-
+    private DirectoryEntry parent = null;
+    private Vector<DirectoryEntry> childList = Vector.empty();
+    private boolean bFirstRun = true;
     private final boolean directory;
+    private FileTime lastModified = null;
 
-    private final Path dirPath;
+    private Option<MovieFolder> movieFolder = Option.none();
+    private Option<GalleryFolder> galleryFolder = Option.none();
+    //private Option<MovieV2> movieData = Option.none();
 
-    private final MoviePaths moviePaths = new MoviePaths();
-
+    private boolean needCheck = true;
     private final BooleanProperty needCheckProperty = new SimpleBooleanProperty(true);
-
     private final StringProperty fileNameProperty = new SimpleStringProperty("");
+    private final StringProperty fileExtensionProperty = new SimpleStringProperty("");
 
-    private final StringProperty fileExtenionProperty = new SimpleStringProperty("");
+    private Option<Image> fileIcon;
+    private Option<Long> size = Option.none();
 
-    protected Option<MovieV2> movieData = Option.none();
+    private int lastSelectedIndex = -1;
 
-    private Image fileIcon;
-
-    private long size = 0;
-
-    protected DirectoryEntry() {
-        this.filePath = null;
-        this.dirPath = null;
-        this.directory = true;
-
-        this.needCheckProperty.setValue(false);
-        this.fileExtenionProperty.set("Folder");
+    private DirectoryEntry() {
+        this.directory = false;
     }
 
-    public DirectoryEntry(@NotNull Path inPath) {
-        this.needCheckProperty.setValue(true);
-        this.fileNameProperty.set(inPath.getFileName().toString());
+    private DirectoryEntry(@NotNull Path inPath, DirectoryEntry parent) {
 
-        this.filePath = inPath;
+        this.setEntryParent(parent);
+        this.setValue(inPath);
+
+        this.needCheckProperty.setValue(true);
+        this.fileNameProperty.set(Option.of(inPath.getFileName()).map(Path::toString).getOrElse(""));
+
         this.directory = Files.isDirectory(inPath);
 
+
         if (!this.isDirectory()) {
-            this.dirPath = inPath.getParent();
             this.fileNameProperty.set(FilenameUtils.removeExtension(this.fileNameProperty.get()));
-            this.fileExtenionProperty.set("File");
+            this.fileExtensionProperty.set("File");
+            this.size = io.vavr.control.Try.of(() -> Files.size(this.getValue()) / 1024 / 1024).toOption();
+            if (this.size.getOrElse(0L) < 1L) {
+                this.size = Option.none();
+            }
+
         } else {
-            this.dirPath = inPath;
-            this.fileExtenionProperty.set("Folder");
+            this.fileExtensionProperty.set("Folder");
+            this.size = Option.none();
         }
 
-        try {
-            ImageIcon ic = (ImageIcon) IconCache.getIconFromCache(inPath.toFile());
+        this.fileIcon = io.vavr.control.Try.of(() -> (ImageIcon) IconCache.getIconFromCache(inPath.toFile()))
+                .map(ic -> {
+                    BufferedImage bImg;
+                    if (ic.getImage() instanceof BufferedImage) {
+                        bImg = (BufferedImage) ic.getImage();
+                    } else {
+                        bImg = new BufferedImage(ic.getImage().getWidth(null), ic.getImage().getHeight(null), BufferedImage.TYPE_INT_ARGB);
+                        Graphics2D graphics = bImg.createGraphics();
+                        graphics.drawImage(ic.getImage(), 0, 0, null);
+                        graphics.dispose();
+                    }
+                    return bImg;
+                })
+                .map(bImg -> (Image) SwingFXUtils.toFXImage(bImg, null))
+                .toOption();
 
-            BufferedImage image = (BufferedImage) ic.getImage();
-            this.fileIcon = SwingFXUtils.toFXImage(image, null);
-        } catch (IOException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
+        this.setGraphic(new ImageView(this.fileIcon.getOrNull()));
+
     }
     // standard constructors/getters
+
+    public void setEntryParent(DirectoryEntry parent) {
+        this.parent = parent;
+    }
+
+    public DirectoryEntry getEntryParent() {
+        return this.parent;
+    }
+
+    public Vector<DirectoryEntry> getChildrenEntry() {
+        //GUICommon.debugMessage("getChildrenEntry " + this.getValue().getFileName().toString());
+
+        if (this.bFirstRun) {
+            this.bFirstRun = false;
+            this.childList = this.buildChildren();
+        }
+
+        return this.childList;
+    }
+
+    public void setChildEntry(Vector<DirectoryEntry> entries) {
+        this.childList = entries;
+    }
+
+    public void removeChild(DirectoryEntry entry) {
+        this.setChildEntry(this.getChildrenEntry().remove(entry));
+    }
+
+    private Vector<DirectoryEntry> buildChildren() {
+        Path path = this.getValue();
+
+        //GUICommon.debugMessage("buildChildren " + path.toString());
+        if (path != null && Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS)) {
+
+            //if (!path.getFileName().toString().contains("Trash")) {
+
+            return io.vavr.control.Try.withResources(() -> Files.newDirectoryStream(path))
+                    .of(ds -> Vector.ofAll(ds)
+                            .sorted(PATH_COMPARATOR)
+                            .map(p -> DirectoryEntry.of(p, this)))
+                    .onFailure(Throwable::printStackTrace)
+                    .getOrElse(Vector.empty());
+            //}
+        }
+        return Vector.empty();
+    }
+
+    public void releaseMemory() {
+        this.movieFolder.peek(MovieFolder::releaseMemory);
+    }
+
+    public void releaseChildMemory() {
+        this.getChildrenEntry().forEach(DirectoryEntry::releaseMemory);
+    }
+
+    private static final Comparator<Path> PATH_COMPARATOR = (p, q) -> {
+        boolean pd = Files.isDirectory(p);
+        boolean qd = Files.isDirectory(q);
+
+        if (pd && !qd) {
+            return -1;
+        } else if (!pd && qd) {
+            return 1;
+        } else {
+            return p.getFileName().toString().compareToIgnoreCase(q.getFileName().toString());
+        }
+    };
+
+    public void resetChild() {
+        this.childList = null;
+        this.bFirstRun = true;
+    }
 
     @NotNull
     @Contract("_ -> new")
     public static DirectoryEntry of(Path inPath) {
-        return new DirectoryEntry(inPath);
+        return new DirectoryEntry(inPath, null);
+    }
+
+    @Contract("_, _ -> new")
+    @NotNull
+    public static DirectoryEntry of(Path inPath, DirectoryEntry parent) {
+        return new DirectoryEntry(inPath, parent);
     }
 
     public static DirectoryEntry getAndExe(Path inPath) {
-        DirectoryEntry directoryEntry = new DirectoryEntry(inPath);
+        DirectoryEntry directoryEntry = new DirectoryEntry(inPath, null);
         Systems.useExecutors(directoryEntry);
         return directoryEntry;
     }
@@ -122,234 +213,92 @@ public class DirectoryEntry implements CheckedFunction0<Boolean>, Runnable {
         return (DirectoryEntry p) -> new Observable[]{p.getNeedCheckProperty()};
     }
 
-    private static Option<Path> getNfoFilePath(@NotNull Vector<Path> dirPath) {
-        return dirPath.find(p -> p.getFileName().toString().endsWith(".nfo"));
-    }
+    private Future<Void> tryLoadLocalActorImageAysc(DirectoryEntry actorImagePath, List<ActorV2> actorList) {
 
-    private static Vector<Tuple2<Path, Long>> getMovieFilePaths(Vector<Path> dirPath) {
-        Vector<String> movExt = Vector.of(MovieFilenameFilter.acceptedMovieExtensions);
+        Stream<ActorV2> actorV2Stream = Stream.ofAll(actorList);
 
-        return dirPath.filter(p -> movExt.find(ext -> p.getFileName().toString().toLowerCase().endsWith(ext)).isDefined())
-                //.peek(p->GUICommon.debugMessage(p.getFileNameProperty().toString()))
-                .map(p -> Tuple.of(p, (Try.withCatch(() -> Files.size(p) / 1024 / 1024, IOException.class).orElse(0L))));
-    }
-
-    private static Future<Stream<FxThumb>> tryLoadExtraImage(Path extraImagePath) {
-
-        return Future.of(Systems.getExecutorServices(),
-                () -> DirectorySystem.readPath(extraImagePath)
-                        .filter(Files::isRegularFile)
-                        .filter(f -> f.getFileName().toString().endsWith(".jpg"))
-                        .map(FxThumb::of).toStream());
-    }
-
-    private static void tryLoadLocalActorImage(Path actorImagePath, List<ActorV2> actorList) {
-
-        Vector<Path> paths = DirectorySystem.readPath(actorImagePath);
-
-        actorList.forEach(a -> paths.find(p -> FileSystems.getDefault().getPathMatcher("glob:"
-                        + a.getName().replace(' ', '_') + "*").matches(p.getFileName()))
-                        .peek(p -> a.setLocalImage(FxThumb.of(p)))
-                //.peek(p -> GUICommon.debugMessage(p.getFileNameProperty().toString())));
+        return Future.run(Systems.getExecutorServices(ExecuteSystem.role.IMAGE),
+                () -> actorImagePath.getChildrenEntry().toStream()
+                        .filter(DirectoryEntry::isFile)
+                        .map(TreeItem::getValue)
+                        //.peek(p -> GUICommon.debugMessage("--Actor " + p.getFileName().toString()))
+                        .peek(path -> {
+                            actorV2Stream
+                                    .find(a -> path.getFileName().toString().startsWith(a.getName().replace(' ', '_')))
+                                    .peek(a -> a.setLocalImage(FxThumb.of(path)))
+                                    .peek(a -> GUICommon.debugMessage("Actor Image Found on Local"))
+                            ;
+                        })
         );
     }
 
-    public Boolean DoCheckFile(boolean needCheck) {
-        if (needCheck) {
+    private void extraCheckForFile() {
+        String strExtension = null;
+        try {
+            this.lastModified = Files.getLastModifiedTime(this.getValue());
+            strExtension = Files.probeContentType(this.getValue());
 
-            Benchmark b = new Benchmark(false, "DirectorEntry - " + this.filePath.getFileName().toString());
-
-            // system.out.println("CHECKING~~~~~~~~~~~~~~~~ ");
-             /*
-              Check if movie exists
-             */
-            String strExtension = null;
-
-            if (!this.isDirectory()) {
-                try {
-                    this.size = Files.size(this.filePath) / 1024 / 1024;
-                    strExtension = Files.probeContentType(this.filePath);
-                    if (strExtension == null) {
-                        InputStream is = new BufferedInputStream(new FileInputStream(this.filePath.toFile()));
-                        strExtension = URLConnection.guessContentTypeFromStream(is);
-                        is.close();
-                    }
-                    String ext = strExtension;
-                    Platform.runLater(() -> this.fileExtenionProperty.set(ext));
-                } catch (IOException e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
-                }
+            if (strExtension == null) {
+                InputStream is = new BufferedInputStream(new FileInputStream(this.getValue().toFile()));
+                strExtension = URLConnection.guessContentTypeFromStream(is);
+                is.close();
             }
+            String ext = strExtension;
+            Platform.runLater(() -> this.fileExtensionProperty.set(ext));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 
-            b.B("1> ");
+    private void extraCheckForDirectory() {
 
-            Vector<Path> dirFileList = DirectorySystem.readPath(this.dirPath);
+        // Check if there has movie files and then build paths data
+        this.movieFolder = MovieFolder.create(this);
 
-            b.B("2> Read P ");
-
-            if (this.isDirectory() || (strExtension != null && strExtension.contains("video"))) {
-                this.moviePaths.setMovies(getMovieFilePaths(dirFileList));
-
-                if (this.isDirectory()) {
-                    this.size = this.moviePaths.getMovies().map(Tuple2::_2).sum().longValue();
-                }
-
-                if (this.moviePaths.getMovies().length() > 10) {
-                    this.moviePaths.setMovies(Vector.empty());
-                }
-            }
-
-            b.B("3> After M ");
-
-            if (this.hasMovie()) {
-                String movName = MovieV2.getUnstackedMovieName(this.moviePaths.getMovies().get()._1());
-                this.moviePaths.resolvePaths(this.dirPath, movName);
-                this.moviePaths.nfoPath = getNfoFilePath(dirFileList).getOrNull();
-
-                //system.out.println("Thread End >>this.logicalPath_Poster	 " + this.logicalPath_Poster.getFileNameProperty().toString());
-
-                b.B("4> After NFO ");
-
-                if (this.hasNfo()) {
-                    this.movieData = Option.of(MovieCacheInstance.cache().get(this.moviePaths.nfoPath));//this.readMovieFromNfoFile(this.nfoPath);
-
-                    if (this.movieData.isEmpty()) {
-                        this.moviePaths.nfoPath = null;
-                    } else {
-
-                        File poster = this.movieData.flatMap(MovieV2::getImgBackCover)
-                                .filter(FxThumb::isLocal)
-                                .flatMap(FxThumb::getLocalPath)
-                                .getOrElse(this.moviePaths.posterPath.toFile());
-
-                        b.B("5> Before P C ");
-
-                        if (poster.exists()) {
-                            this.movieData.flatMap(MovieV2::getImgBackCover).peek((t) -> t.getImageLocal(poster, (i) -> {
-                            }));
-                        } else {
-                            this.movieData.get().setImgBackCover(Option.none());
-                        }
-
-                        if (Files.exists(this.moviePaths.coverPath)) {
-                            //GUICommon.debugMessage("Files.exists");
-                            this.movieData.flatMap(MovieV2::getImgFrontCover).peek((t) -> t.getImageLocal(this.moviePaths.coverPath.toFile(), (i) -> {
-                            }));
-                        }
-
-                        b.B("6> After P C ");
-
-
-                        if (Files.exists(this.moviePaths.actorFolderPath)) {
-                            tryLoadLocalActorImage(this.moviePaths.actorFolderPath, this.movieData.get().getActorList());
-                        }
-
-                        if (Files.exists(this.moviePaths.extraArtFolderPath)) {
-                            tryLoadExtraImage(this.moviePaths.extraArtFolderPath).onSuccess(this.movieData.get()::setImgExtras);
-                        }
-
-                    }
-                }
-            }
-
-            b.B("F ");
-
-            Platform.runLater(() -> this.setNeedCheck(false));
+        this.size = this.movieFolder.map(v -> v.getMovieFilesPath().map(Tuple2::_2).sum().longValue());
+        if (this.size.getOrElse(0L) < 1L) {
+            this.size = Option.none();
         }
 
-        return true;
+        if (this.movieFolder.isEmpty()) {
+            this.galleryFolder = GalleryFolder.create(this);
+        }
     }
 
     public void clearCache() {
-
-        this.movieData.peek(MovieV2::clearCache);
-
-        if (this.hasNfo()) {
-            //  system.out.println("Debug MovieCacheInstance B" + MovieCacheInstance.cache().size());
-            MovieCacheInstance.cache().evict(this.moviePaths.nfoPath);
-            //system.out.println("Debug MovieCacheInstance A" + MovieCacheInstance.cache().size());
-        }
-        this.moviePaths.clear();
+        this.movieFolder.peek(MovieFolder::clear);
+        this.movieFolder = Option.none();
+        this.resetChild();
         this.setNeedCheck(true);
+        this.setNeedCheckProperty(true);
     }
 
     public void writeMovieDataToFile(Option<ObservableList<String>> outText, Runnable runWhenFinish) {
 
-        MovieV2 MovieToSave = this.getMovieData();
-
-        if (!MovieToSave.hasValidTitle()) {
-            System.out.println("No match for this movie in the array or there was no title filled in; skipping writing");
+        if (this.movieFolder.isEmpty()) {
+            GUICommon.writeToObList(">> Error >> No movie files exist at this directory!", outText);
             return;
         }
 
-        GUICommon.writeToObList("=======================================================", outText);
-        GUICommon.writeToObList("Writing movie: " + this.movieData.map(MovieV2::getMovieTitle).map(Title::getTitle).get(), outText);
-        GUICommon.writeToObList("=======================================================", outText);
-
-        GeneralSettings preferences = GUICommon.getPreferences();
-
-        Systems.useExecutors(() -> {
-
-            if (preferences.getRenameMovieFile()) {
-                String movID = this.movieData.map(RenameSettings::getSuitableFileName).get();
-
-                try {
-                    int Naming = 1;
-                    for (Path p : this.moviePaths.getMovies().map(Tuple2::_1)) {
-                        String ext = FilenameUtils.getExtension(p.getFileName().toString());
-                        Path idealPath;
-                        if (this.moviePaths.getMovies().size() > 1) {
-                            idealPath = this.dirPath.resolve(movID + " pt" + Naming + "." + ext);
-                            Naming++;
-                        } else {
-                            idealPath = this.dirPath.resolve(movID + "." + ext);
+        Single.fromCallable(() -> MovieFolder.writeMovie(this.movieFolder.get(), outText))
+                .doOnSuccess(b -> {
+                    Platform.runLater(() ->
+                    {
+                        Systems.getDirectorySystem().reloadFile(this);
+                        //this.clearCache();
+                        //this.apply();
+                        if (runWhenFinish != null) {
+                            runWhenFinish.run();
                         }
-                        GUICommon.writeToObList(">> " + idealPath.getFileName(), outText);
-                        Files.move(p, idealPath);
-                    }
-
-                    if (this.hasNfo()) {
-                        Files.deleteIfExists(this.moviePaths.nfoPath);
-                        Files.deleteIfExists(this.moviePaths.posterPath);
-                        Files.deleteIfExists(this.moviePaths.coverPath);
-                    }
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-
-                this.moviePaths.nfoPath = this.dirPath.resolve(Movie.getFileNameOfNfo(movID, preferences.getNfoNamedMovieDotNfo()));
-                this.moviePaths.resolvePaths(this.dirPath, movID);
-            }
-
-            try {
-                MovieToSave.writeToFile(
-                        this.moviePaths.getNfoPath(),
-                        this.moviePaths.getPosterPath(),
-                        this.moviePaths.getCoverPath(),
-                        this.moviePaths.getFolderImagePath(),
-                        this.moviePaths.getActorFolderPath(),
-                        this.moviePaths.getExtraArtFolderPath(),
-                        this.moviePaths.getTrailerPath(),
-                        preferences, outText);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-
-            Platform.runLater(() ->
-            {
-                if (runWhenFinish != null) {
-                    runWhenFinish.run();
-                }
-                GUICommon.writeToObList("=======================================================", outText);
-                GUICommon.writeToObList("FINISH WRITE TO FILE", outText);
-                GUICommon.writeToObList("=======================================================", outText);
-            });
-        });
+                    });
+                })
+                .subscribeOn(Schedulers.io())
+                .subscribe();
     }
 
+
     public Image getFileIcon() {
-        return this.fileIcon;
+        return this.fileIcon.getOrNull();
     }
 
     public String getFileName() {
@@ -357,51 +306,67 @@ public class DirectoryEntry implements CheckedFunction0<Boolean>, Runnable {
     }
 
     public Boolean getNeedCheck() {
-        return this.needCheckProperty.get();
+        return this.needCheck;
     }
 
-    private void setNeedCheck(Boolean needCheck) {
-        this.needCheckProperty.set(needCheck);
+    private void setNeedCheck(boolean needCheck) {
+        this.needCheck = needCheck;
     }
 
     public String getFileExtenion() {
-        return this.fileExtenionProperty.get();
+        return this.fileExtensionProperty.get();
     }
 
     public Boolean hasMovie() {
-        return (this.moviePaths.getMovies().length() > 0);
+        return this.movieFolder.map(v -> v.getMovieFilesPath().length() > 0).getOrElse(false);
     }
 
     public Boolean hasNfo() {
-        return (this.moviePaths.nfoPath != null);
+        return this.movieFolder.map(MovieFolder::hasNfo).getOrElse(false);
     }
 
-    public Path getNfoPath() {
-        return this.moviePaths.nfoPath;
+    public boolean isGalleryFolder() {
+        return this.galleryFolder.isDefined();
     }
 
-    public Path getActorPath() {
-        return this.moviePaths.getActorFolderPath();
+    public Stream<FxThumb> getGalleryImages() {
+        return this.galleryFolder.map(v -> v.getGalleryImages().toStream()).getOrElse(Stream.empty());
     }
 
-    public long getMovieSize() {
+    public Option<Long> getMovieSize() {
         return this.size;
     }
 
     public MovieV2 getMovieData() {
-        return this.movieData.getOrNull();
+        return this.movieFolder.flatMap(MovieFolder::getMovieData).getOrNull();
     }
 
     public void setMovieData(MovieV2 movieData) {
-        this.movieData = Option.of(movieData);
-        MovieCacheInstance.cache().put(this.getDirPath(), movieData);
+        this.movieFolder.peek(v -> v.setMovieData(Option.of(movieData)));
+        //MovieCacheInstance.cache().put(this.getDirPath(), movieData);
     }
 
     @Override
     public Boolean apply() {
-        // TODO Auto-generated method stub
-        // system.out.println("Thread Running >> ");
-        return this.DoCheckFile(this.getNeedCheck());
+        //return this.DoCheckFile(this.getNeedCheck());
+
+        if (this.getNeedCheck()) {
+            //Benchmark b = new Benchmark(false, "DirectorEntry - " + this.getValue().getFileName().toString());
+            // system.out.println("CHECKING~~~~~~~~~~~~~~~~ ");
+
+            if (this.isFile()) {
+                this.extraCheckForFile();
+            } else {
+                //GUICommon.debugMessage(this.getValue().toString());
+                this.extraCheckForDirectory();
+            }
+            //b.B("F ");
+            this.setNeedCheck(false);
+            Platform.runLater(() -> this.setNeedCheckProperty(false));
+
+            // GUICommon.debugMessage(this.getValue().getFileName().toString() + " || " + this.movieData.map(MovieV2::getMovieTitle).map(Title::getTitle).getOrElse(""));
+        }
+        return true;
     }
 
     @Override
@@ -410,194 +375,50 @@ public class DirectoryEntry implements CheckedFunction0<Boolean>, Runnable {
     }
 
     public Path getFilePath() {
-        return this.filePath;
+        return this.getValue();
     }
 
     public boolean isDirectory() {
         return this.directory;
     }
 
-    public Path getDirPath() {
-        return this.dirPath;
+    public boolean isFile() {
+        return !this.directory;
     }
 
-    public MoviePaths getMoviePaths() {
-        return this.moviePaths;
+    public Path getDirPath() {
+        return this.isDirectory() ? this.getValue() : this.getValue().getParent();
+    }
+
+    public Option<MovieFolder> getMovieFolder() {
+        return this.movieFolder;
     }
 
     public BooleanProperty getNeedCheckProperty() {
         return this.needCheckProperty;
     }
 
+    public void setNeedCheckProperty(boolean b) {
+        this.needCheckProperty.set(b);
+    }
+
     public StringProperty getFileNameProperty() {
         return this.fileNameProperty;
     }
 
-    public StringProperty getFileExtenionProperty() {
-        return this.fileExtenionProperty;
+    public StringProperty getFileExtensionProperty() {
+        return this.fileExtensionProperty;
     }
 
-    class MoviePaths {
-        Vector<Tuple2<Path, Long>> movies = Vector.empty();
-        Path nfoPath = null;
-        Path posterPath = null;
-        Path coverPath = null;
-        Path folderImagePath = null;
-        Path trailerPath = null;
-        Path extraArtFolderPath = null;
-        Path actorFolderPath = null;
-
-        public MoviePaths() {
-        }
-
-        void resolvePaths(Path dirPath, String movName) {
-            GeneralSettings preferences = GUICommon.getPreferences();
-
-            this.nfoPath = dirPath.resolve(MovieV2.getFileNameOfNfo(movName, preferences.getNfoNamedMovieDotNfo()));
-            this.posterPath = dirPath.resolve(MovieV2.getFileNameOfPoster(movName, preferences.getNoMovieNameInImageFiles()));
-            this.coverPath = dirPath.resolve(MovieV2.getFileNameOfFanart(movName, preferences.getNoMovieNameInImageFiles()));
-            this.folderImagePath = dirPath.resolve(MovieV2.getFileNameOfFolderJpg());
-            this.trailerPath = dirPath.resolve("-trailer.mp4");
-            this.actorFolderPath = dirPath.resolve(".actors");
-            this.extraArtFolderPath = dirPath.resolve("extrafanart");
-        }
-
-        void clear() {
-            this.movies = Vector.empty();
-            this.nfoPath = null;
-        }
-
-        public Vector<Tuple2<Path, Long>> getMovies() {
-            return this.movies;
-        }
-
-        public Path getNfoPath() {
-            return this.nfoPath;
-        }
-
-        public Path getPosterPath() {
-            return this.posterPath;
-        }
-
-        public Path getCoverPath() {
-            return this.coverPath;
-        }
-
-        public Path getFolderImagePath() {
-            return this.folderImagePath;
-        }
-
-        public Path getTrailerPath() {
-            return this.trailerPath;
-        }
-
-        public Path getExtraArtFolderPath() {
-            return this.extraArtFolderPath;
-        }
-
-        public Path getActorFolderPath() {
-            return this.actorFolderPath;
-        }
-
-        public void setMovies(Vector<Tuple2<Path, Long>> movies) {
-            this.movies = movies;
-        }
-
-        public void setNfoPath(Path nfoPath) {
-            this.nfoPath = nfoPath;
-        }
-
-        public void setPosterPath(Path posterPath) {
-            this.posterPath = posterPath;
-        }
-
-        public void setCoverPath(Path coverPath) {
-            this.coverPath = coverPath;
-        }
-
-        public void setFolderImagePath(Path folderImagePath) {
-            this.folderImagePath = folderImagePath;
-        }
-
-        public void setTrailerPath(Path trailerPath) {
-            this.trailerPath = trailerPath;
-        }
-
-        public void setExtraArtFolderPath(Path extraArtFolderPath) {
-            this.extraArtFolderPath = extraArtFolderPath;
-        }
-
-        public void setActorFolderPath(Path actorFolderPath) {
-            this.actorFolderPath = actorFolderPath;
-        }
-
-        public boolean equals(final Object o) {
-            if (o == this) return true;
-            if (!(o instanceof MoviePaths)) return false;
-            final MoviePaths other = (MoviePaths) o;
-            if (!other.canEqual((Object) this)) return false;
-            final Object this$movies = this.movies;
-            final Object other$movies = other.movies;
-            if (this$movies == null ? other$movies != null : !this$movies.equals(other$movies)) return false;
-            final Object this$nfoPath = this.nfoPath;
-            final Object other$nfoPath = other.nfoPath;
-            if (this$nfoPath == null ? other$nfoPath != null : !this$nfoPath.equals(other$nfoPath)) return false;
-            final Object this$posterPath = this.posterPath;
-            final Object other$posterPath = other.posterPath;
-            if (this$posterPath == null ? other$posterPath != null : !this$posterPath.equals(other$posterPath))
-                return false;
-            final Object this$coverPath = this.coverPath;
-            final Object other$coverPath = other.coverPath;
-            if (this$coverPath == null ? other$coverPath != null : !this$coverPath.equals(other$coverPath))
-                return false;
-            final Object this$folderImagePath = this.folderImagePath;
-            final Object other$folderImagePath = other.folderImagePath;
-            if (this$folderImagePath == null ? other$folderImagePath != null : !this$folderImagePath.equals(other$folderImagePath))
-                return false;
-            final Object this$trailerPath = this.trailerPath;
-            final Object other$trailerPath = other.trailerPath;
-            if (this$trailerPath == null ? other$trailerPath != null : !this$trailerPath.equals(other$trailerPath))
-                return false;
-            final Object this$extraArtFolderPath = this.extraArtFolderPath;
-            final Object other$extraArtFolderPath = other.extraArtFolderPath;
-            if (this$extraArtFolderPath == null ? other$extraArtFolderPath != null : !this$extraArtFolderPath.equals(other$extraArtFolderPath))
-                return false;
-            final Object this$actorFolderPath = this.actorFolderPath;
-            final Object other$actorFolderPath = other.actorFolderPath;
-            if (this$actorFolderPath == null ? other$actorFolderPath != null : !this$actorFolderPath.equals(other$actorFolderPath))
-                return false;
-            return true;
-        }
-
-        protected boolean canEqual(final Object other) {
-            return other instanceof MoviePaths;
-        }
-
-        public int hashCode() {
-            final int PRIME = 59;
-            int result = 1;
-            final Object $movies = this.movies;
-            result = result * PRIME + ($movies == null ? 43 : $movies.hashCode());
-            final Object $nfoPath = this.nfoPath;
-            result = result * PRIME + ($nfoPath == null ? 43 : $nfoPath.hashCode());
-            final Object $posterPath = this.posterPath;
-            result = result * PRIME + ($posterPath == null ? 43 : $posterPath.hashCode());
-            final Object $coverPath = this.coverPath;
-            result = result * PRIME + ($coverPath == null ? 43 : $coverPath.hashCode());
-            final Object $folderImagePath = this.folderImagePath;
-            result = result * PRIME + ($folderImagePath == null ? 43 : $folderImagePath.hashCode());
-            final Object $trailerPath = this.trailerPath;
-            result = result * PRIME + ($trailerPath == null ? 43 : $trailerPath.hashCode());
-            final Object $extraArtFolderPath = this.extraArtFolderPath;
-            result = result * PRIME + ($extraArtFolderPath == null ? 43 : $extraArtFolderPath.hashCode());
-            final Object $actorFolderPath = this.actorFolderPath;
-            result = result * PRIME + ($actorFolderPath == null ? 43 : $actorFolderPath.hashCode());
-            return result;
-        }
-
-        public String toString() {
-            return "DirectoryEntry.MoviePaths(movies=" + this.getMovies() + ", nfoPath=" + this.getNfoPath() + ", posterPath=" + this.getPosterPath() + ", coverPath=" + this.getCoverPath() + ", folderImagePath=" + this.getFolderImagePath() + ", trailerPath=" + this.getTrailerPath() + ", extraArtFolderPath=" + this.getExtraArtFolderPath() + ", actorFolderPath=" + this.getActorFolderPath() + ")";
-        }
+    public int getLastSelectedIndex() {
+        return this.lastSelectedIndex;
     }
 
+    public void setLastSelectedIndex(int lastSelectedIndex) {
+        this.lastSelectedIndex = lastSelectedIndex;
+    }
+
+    public FileTime getLastModified() {
+        return this.lastModified;
+    }
 }
