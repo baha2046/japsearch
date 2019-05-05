@@ -3,17 +3,22 @@ package org.nagoya.view;
 import com.jfoenix.controls.JFXListView;
 import com.jfoenix.controls.JFXTextArea;
 import com.jfoenix.controls.JFXTextField;
+import io.vavr.control.Option;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
 import javafx.geometry.Pos;
+import javafx.geometry.Rectangle2D;
 import javafx.scene.Group;
 import javafx.scene.Scene;
+import javafx.scene.SnapshotParameters;
 import javafx.scene.control.Button;
 import javafx.scene.control.ListView;
 import javafx.scene.control.cell.TextFieldListCell;
 import javafx.scene.effect.BoxBlur;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.GridPane;
 import javafx.scene.paint.Color;
@@ -22,7 +27,9 @@ import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import javafx.stage.Window;
 import org.nagoya.App;
+import org.nagoya.GUICommon;
 import org.nagoya.model.dataitem.ActorV2;
+import org.nagoya.model.dataitem.FxThumb;
 import org.nagoya.model.dataitem.Genre;
 import org.nagoya.system.FXMLController;
 import org.nagoya.view.customcell.ActorListRectCell;
@@ -50,12 +57,50 @@ public class FXMovieDetailView extends FXMLController {
     protected JFXListView<Genre> lvGenres;
     @FXML
     protected JFXTextField txtD, txtM;
+    @FXML
+    private ImageView viewFrontCover, viewBackCover;
 
     public FXMovieDetailView() {
     }
 
     static String normalize(String str) {
         return Normalizer.normalize(str, Normalizer.Form.NFKC);
+    }
+
+    public Image setImage(Image imageFront, Rectangle2D viewport, Image imageBack) {
+        this.viewFrontCover.setImage(imageFront);
+        this.viewFrontCover.setViewport(viewport);
+        this.viewBackCover.setImage(imageBack);
+
+        this.viewBackCover.setOnMouseClicked((e) -> {
+            ImageView view = new ImageView();
+
+            Double maxWidth = App.getCurrentStage().map(Window::getWidth).getOrElse((double) 400) - 70;
+            Double maxHeight = App.getCurrentStage().map(Window::getHeight).getOrElse((double) 400) - 170;
+            FxThumb.fitImageView(view, imageBack, Option.of(maxWidth), Option.of(maxHeight));
+
+            GUICommon.showDialog("", view, "Close", null, null);
+        });
+
+        if (viewport != null) {
+            this.viewFrontCover.setOnMouseClicked(null);
+            ImageView view = new ImageView();
+            FxThumb.fitImageView(view, imageBack, Option.of(imageBack.getWidth()), Option.of(imageBack.getHeight()));
+            view.setViewport(viewport);
+            return view.snapshot(new SnapshotParameters(), null);
+        } else {
+            this.viewFrontCover.setOnMouseClicked((e) -> {
+                ImageView view = new ImageView();
+
+                Double maxWidth = App.getCurrentStage().map(Window::getWidth).getOrElse((double) 400) - 70;
+                Double maxHeight = App.getCurrentStage().map(Window::getHeight).getOrElse((double) 400) - 170;
+                FxThumb.fitImageView(view, imageFront, Option.of(maxWidth), Option.of(maxHeight));
+
+                GUICommon.showDialog("", view, "Close", null, null);
+            });
+        }
+
+        return imageFront;
     }
 
     void bindData(Map<String, SimpleStringProperty> customDataMap, ObservableList<ActorV2> actorObservableList, ObservableList<Genre> genreObservableList) {
@@ -84,7 +129,7 @@ public class FXMovieDetailView extends FXMLController {
 
     @FXML
     private void addActorAction() {
-        this.lvActors.getItems().add(ActorV2.of("Actor", ActorV2.Source.NONE,"", "", ""));
+        this.lvActors.getItems().add(ActorV2.of("Actor", ActorV2.Source.NONE, "", "", ""));
     }
 
     @Override
@@ -98,6 +143,11 @@ public class FXMovieDetailView extends FXMLController {
                 FXGenresEditor.show(this.lvGenres.getItems());
             }
         });
+
+        this.viewFrontCover.setFitHeight(430);
+        this.viewFrontCover.setPreserveRatio(true);
+        this.viewBackCover.setFitHeight(270);
+        this.viewBackCover.setPreserveRatio(true);
     }
 
 
@@ -128,7 +178,7 @@ public class FXMovieDetailView extends FXMLController {
             this.dialog.showingProperty().addListener((observableValue, wasShowing, isShowing) ->
             {
                 //system.out.println("this.dialog.showingProperty().addListener((observableValue, wasShowing, isShowing) -> >> " + isShowing);
-                App.getCurrentStage().map(Window::getScene).map(Scene::getRoot).peek(r->r.setEffect(isShowing ? new BoxBlur() : null));
+                App.getCurrentStage().map(Window::getScene).map(Scene::getRoot).peek(r -> r.setEffect(isShowing ? new BoxBlur() : null));
             });
 
             this.simpleList = new ListView<>(this.observableData);

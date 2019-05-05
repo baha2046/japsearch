@@ -11,6 +11,7 @@ import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
 import javafx.fxml.FXML;
 import javafx.geometry.Rectangle2D;
+import javafx.scene.image.Image;
 import javafx.scene.layout.Pane;
 import javafx.scene.shape.Rectangle;
 import javafx.util.Duration;
@@ -32,8 +33,8 @@ import java.util.ResourceBundle;
 
 public class FXMoviePanelView extends FXMLController {
 
-    private static Rectangle2D boxBounds = new Rectangle2D(0, 0, 460, 660);
-    private static double ACTION_BOX_HGT = 0;
+    private static final Rectangle2D boxBounds = new Rectangle2D(0, 0, 860, 660);
+    private static final double ACTION_BOX_HGT = 0;
     @FXML
     public JFXButton btnSAll, btnSAllCustom;
     @FXML
@@ -53,6 +54,10 @@ public class FXMoviePanelView extends FXMLController {
 
 
     public FXMoviePanelView() {
+    }
+
+    public Image setImage(Image imageFront, Rectangle2D viewport, Image imageBack) {
+        return this.movieDetailDisplay.setImage(imageFront, viewport, imageBack);
     }
 
     private void setAnimation() {

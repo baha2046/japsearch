@@ -7,7 +7,6 @@ import javafx.collections.ObservableList;
 import javafx.scene.control.Separator;
 import javafx.scene.layout.VBox;
 import org.nagoya.GUICommon;
-import org.nagoya.UtilCommon;
 import org.nagoya.model.DirectoryEntry;
 import org.nagoya.preferences.RenameSettings;
 import org.nagoya.system.Systems;
@@ -17,8 +16,7 @@ import java.nio.file.Path;
 
 public class FXRenameAllDialog {
 
-    public static void show()
-    {
+    public static void show() {
         JFXListView<String> textArea = GUICommon.getTextArea(500, 500, true);
 
         JFXButton btnEdit = GUICommon.getBorderButton("Setting", e -> {
@@ -28,31 +26,25 @@ public class FXRenameAllDialog {
         JFXButton btnRun = GUICommon.getOkButton("Rename All", null);
 
         btnRun.setOnAction(e -> {
-
             textArea.getItems().clear();
             Option<ObservableList<String>> outs = Option.of(textArea.getItems());
-            ObservableList<DirectoryEntry> directoryEntries = Systems.getDirectorySystem().getDirectoryEntries();
 
-            Systems.useExecutors(()-> {
-                boolean bReload = false;
-                for (int x = 0; x < directoryEntries.size(); x++) {
-                    DirectoryEntry directoryEntry = directoryEntries.get(x);
-                    if (directoryEntry.isDirectory() && directoryEntry.hasMovie() && directoryEntry.hasNfo()) {
-                        Path newPath = directoryEntry.getFilePath().getParent().resolve(RenameSettings.getSuitableDirectoryName(directoryEntry.getMovieData()).trim());
-                        if (!newPath.equals(directoryEntry.getFilePath())) {
-                            bReload = true;
-                            if (UtilCommon.renameFile(directoryEntry.getFilePath(), newPath)) {
-                                directoryEntry.clearCache();
-                                directoryEntries.set(x, DirectoryEntry.getAndExe(newPath));
+            Systems.useExecutors(() -> {
+                Systems.getDirectorySystem()
+                        .getDirectoryEntries()
+                        .filter(DirectoryEntry::isDirectory)
+                        .filter(DirectoryEntry::hasNfo)
+                        .forEach(d ->
+                        {
+                            Path newPath = d.getValue().resolveSibling(RenameSettings.getSuitableDirectoryName(d.getMovieData()).trim());
+                            if (!newPath.equals(d.getFilePath())) {
+                                Systems.getDirectorySystem().renameFile(d, newPath);
+                                GUICommon.writeToObList(newPath.getFileName().toString(), outs);
+                            } else {
+                                GUICommon.writeToObList("Skip - same name (" + newPath.getFileName().toString() + ")", outs);
                             }
-                            GUICommon.writeToObList(newPath.getFileName().toString(), outs);
-                        } else {
-                            GUICommon.writeToObList("Skip - same name (" + newPath.getFileName().toString() + ")", outs);
-                        }
-                    }
-                }
+                        });
                 GUICommon.writeToObList("Finish", outs);
-                if(bReload) Systems.getDirectorySystem().reloadDirectory();
             });
         });
 

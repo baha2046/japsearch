@@ -10,6 +10,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import org.jetbrains.annotations.NotNull;
 import org.nagoya.GUICommon;
 import org.nagoya.model.MovieV2;
 import org.nagoya.model.dataitem.*;
@@ -222,8 +223,8 @@ public class FXMovieDetailCompareView extends FXMovieDetailView {
 
         this.btnCover.setDisable(movie.getImgBackCover().isEmpty());
         this.btnCover.setOnAction((e) -> {
-            GUICommon.showDialog(movie.getImgBackCover().map(t->t.getThumbURL().toString()).getOrElse(""),
-                    new ImageView(movie.getImgBackCover().map(FxThumb::getImage).getOrElse((Image)null)),
+            GUICommon.showDialog(movie.getImgBackCover().map(t -> t.getThumbURL().toString()).getOrElse(""),
+                    new ImageView(movie.getImgBackCover().map(FxThumb::getImage).getOrElse((Image) null)),
                     "Close", null, null);
         });
 
@@ -295,13 +296,17 @@ public class FXMovieDetailCompareView extends FXMovieDetailView {
 
         ObservableList<Genre> genreObservableList = FXCollections.observableArrayList(movie.getGenreList());
 
+        ObservableList<ActorV2> actorV2ObservableList = FXCollections.observableArrayList();
+        this.lvActors1.setItems(actorV2ObservableList);
+        movie.getActorList(actorV2ObservableList::addAll);
+
         this.btnA.setSelected(false);
-        this.lvActors1.setItems(movie.getActorList());
+        //      this.lvActors1.setItems(movie.getActorList());
         //this.lvActors1.setItems(actorObservableList);
         this.lvGenres1.setItems(genreObservableList);
     }
 
-    private void autoSelection(JFXTextField t1, JFXTextField t2, JFXToggleButton b) {
+    private void autoSelection(@NotNull JFXTextField t1, @NotNull JFXTextField t2, JFXToggleButton b) {
         if (Objects.equals(t2.getText(), t1.getText())) {
             b.setVisible(false);
         } else if (t1.getText().length() > 0 && t2.getText().length() == 0) {
