@@ -49,7 +49,7 @@ public class JFXDialogPool {
 
     public void initialize(int size, StackPane stackPane) {
         for (int x = 0; x < size; x++) {
-            this.dialogs.add(new JFXDialog(stackPane, null, JFXDialog.DialogTransition.CENTER));
+            this.dialogs.add(new JFXDialog(stackPane, null, /*JFXDialog.DialogTransition.CENTER*/ JFXDialog.DialogTransition.NONE));
         }
     }
 
@@ -91,7 +91,8 @@ public class JFXDialogPool {
         if(body == null) body = new Text();
 
         JFXDialogLayout content = new JFXDialogLayout();
-        content.setHeading(new Text(heading));
+
+        if(!heading.equals("")) content.setHeading(new Text(heading));
         content.setBody(body);
 
         useDialog.setContent(content);

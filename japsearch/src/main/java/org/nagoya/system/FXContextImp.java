@@ -1,7 +1,6 @@
 package org.nagoya.system;
 
 
-import org.nagoya.GUICommon;
 import org.nagoya.system.event.CustomEvent;
 import org.nagoya.system.event.CustomEventType;
 
@@ -17,7 +16,7 @@ public abstract class FXContextImp extends FXMLController implements FXContext {
 
     @Override
     public void fireEvent(CustomEventType eventType, Object object) {
-        GUICommon.debugMessage(() -> "fireEvent " + eventType.getName());
+        //GUICommon.debugMessage(() -> "fireEvent " + eventType.getName());
         Systems.getEventDispatcher().submit(new CustomEvent(object, eventType));
     }
 

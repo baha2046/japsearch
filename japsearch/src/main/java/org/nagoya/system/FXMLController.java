@@ -16,8 +16,9 @@ public abstract class FXMLController implements Initializable {
         return this.pane;
     }
 
-    public FXMLController setPane(Node pane) {
+    @SuppressWarnings("unchecked")
+    public <T extends FXMLController> T setPane(Node pane) {
         this.pane = pane;
-        return this;
+        return (T) this;
     }
 }

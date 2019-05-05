@@ -52,10 +52,10 @@ public class GuiSettings extends Settings {
 
 	public Path getDirectory(Key key)
     {
-        if(key == Key.doujinshiDirectory) return Paths.get("Y:\\[DOUJINSHI]");
-        if(key == Key.mangaDirectory) return Paths.get("Y:\\[COMIC]");
-        if(key == Key.cosplayDirectory) return Paths.get("Y:\\[COSPLAY]");
-        return Paths.get("Z:\\AV");
+        if(key == Key.doujinshiDirectory) return Paths.get("X:\\[DOUJINSHI]");
+        if(key == Key.mangaDirectory) return Paths.get("X:\\[COMIC]");
+        if(key == Key.cosplayDirectory) return Paths.get("X:\\Cosplay");
+        return Paths.get("X:\\Movies\\AV");
     }
 
 	public Path getLastUsedDirectory() 

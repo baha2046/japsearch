@@ -1,32 +1,31 @@
 package org.nagoya.system.event;
 
 import javafx.application.Platform;
+import org.nagoya.system.ExecuteSystem;
+import org.nagoya.system.Systems;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.stream.Stream;
 
 public class EventDispatcher {
 
     private final EventListenerManager listenerManager = new EventListenerManager();
-    private final BlockingQueue<CustomEvent> eventsQueue = new LinkedBlockingQueue<>();
-    private final Thread dispatchingThread;
+    //private final BlockingQueue<CustomEvent> eventsQueue = new LinkedBlockingQueue<>();
+    //private final Thread dispatchingThread;
 
     public EventDispatcher() {
-        this.dispatchingThread = new Thread(this::dispatchingLoop, "CustomEventDispatcher Thread");
+        //this.dispatchingThread = new Thread(this::dispatchingLoop, "CustomEventDispatcher Thread");
         //set this thread as daemon. It will not prevent the application from exiting
-        this.dispatchingThread.setDaemon(true);
-        this.dispatchingThread.start();
+        //this.dispatchingThread.setDaemon(true);
+        //this.dispatchingThread.start();
     }
 
-
-    public void interrupt() {
+    /*public void interrupt() {
         this.dispatchingThread.interrupt();
-    }
+    }*/
 
     public void register(CustomEventType type, CustomEventListener listener) {
         this.listenerManager.register(type, listener);
@@ -39,7 +38,9 @@ public class EventDispatcher {
     public void submit(CustomEvent event) {
         assert event != null : "Event cannot be null";
 
-        this.eventsQueue.add(event);
+        Systems.useExecutors(ExecuteSystem.role.EVENT, ()->{
+            listenerManager.getEventListeners(event.getType()).forEach(l->this.dispatch(l,event));
+        });
     }
 
     private void dispatch(CustomEventListener listener, CustomEvent event) {
@@ -53,7 +54,7 @@ public class EventDispatcher {
         }
     }
 
-    private void dispatchingLoop() {
+  /*  private void dispatchingLoop() {
         while (!Thread.currentThread().isInterrupted()) {
             try {
                 final CustomEvent event = this.eventsQueue.take();
@@ -66,7 +67,7 @@ public class EventDispatcher {
                 break;
             }
         }
-    }
+    }*/
 
     class EventListenerManager {
 
